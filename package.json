@@ -18,7 +18,7 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:test": "supabase test db --local",
-    "db:types": "supabase gen types --lang typescript --local --schema public > apps/web/src/types/database.types.ts",
+    "db:types": "supabase gen types --lang typescript --local --schema public > apps/web/src/types/database.types.ts && node scripts/normalize-database-types.mjs",
     "dev": "npm run dev --workspace @stock-take/web",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
