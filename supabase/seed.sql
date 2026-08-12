@@ -34,6 +34,13 @@ values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Fixture Company A'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Fixture Company B');
 
+insert into public.company_settings (company_id, reopen_window_days)
+values
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 3),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 3)
+on conflict (company_id) do update
+set reopen_window_days = excluded.reopen_window_days;
+
 insert into public.warehouses (id, company_id, warehouse_code, name)
 values
   ('a1000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'A-JHB', 'Company A Johannesburg'),
@@ -97,12 +104,16 @@ insert into public.stock_takes (
   company_id,
   warehouse_id,
   status,
-  created_by
+  created_by,
+  ready_at,
+  started_at,
+  completed_at,
+  completed_by
 )
 values
-  ('a4000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000020'),
-  ('a4000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000002', 'COMPLETED', '10000000-0000-4000-8000-000000000001'),
-  ('b4000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000040');
+  ('a4000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000020', null, null, null, null),
+  ('a4000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000002', 'COMPLETED', '10000000-0000-4000-8000-000000000001', '2026-08-01T07:00:00+02:00', '2026-08-01T08:00:00+02:00', now(), '10000000-0000-4000-8000-000000000001'),
+  ('b4000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000040', null, null, null, null);
 
 insert into public.import_jobs (
   id,

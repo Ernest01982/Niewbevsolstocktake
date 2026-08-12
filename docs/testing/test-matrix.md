@@ -1,8 +1,8 @@
 # Version 1 test matrix
 
-This matrix separates tests automated through Phase 2 from mandatory later-phase coverage. A later-phase row is not marked passed merely because its table or workflow does not yet exist.
+This matrix separates tests automated through Phase 3 from mandatory later-phase coverage. A later-phase row is not marked passed merely because its table or workflow does not yet exist.
 
-## Phase 0 through Phase 2 automated tests
+## Phase 0 through Phase 3 automated tests
 
 | ID           | Area          | Scenario                                              | Expected result                    | Automation   |
 | ------------ | ------------- | ----------------------------------------------------- | ---------------------------------- | ------------ |
@@ -44,12 +44,24 @@ This matrix separates tests automated through Phase 2 from mandatory later-phase
 | P2-RLS-03    | Restricted    | Stock Taker queries imports, stock takes, or SOH      | Zero rows                          | pgTAP        |
 | P2-RLS-04    | Warehouse     | Manager/Admin queries another warehouse SOH           | Denied                             | pgTAP        |
 | P2-RPC-01    | Authorisation | Stock Taker invokes either import RPC                 | Structured forbidden result        | pgTAP        |
+| P3-STATE-01  | Lifecycle     | Invalid or skipped lifecycle transition               | Rejected by database trigger       | pgTAP        |
+| P3-STATE-02  | Lifecycle     | READY with missing/unresolved snapshot                | Rejected with structured result    | pgTAP        |
+| P3-STATE-03  | Snapshot      | Clean retry revalidates identical immutable line      | Accepted without replacement       | pgTAP        |
+| P3-CONC-01   | Stock take    | Second open stock take in warehouse                   | Rejected by partial unique index   | pgTAP        |
+| P3-CONC-02   | Session       | User starts a second active warehouse session         | Rejected/recovered idempotently    | pgTAP        |
+| P3-RLS-01    | Sessions      | Stock Taker reads another user's session              | Denied                             | pgTAP        |
+| P3-RLS-02    | Sessions      | Manager/Admin reads unallocated warehouse sessions    | Denied                             | pgTAP        |
+| P3-RLS-03    | Restricted    | Stock-taker context requests restricted stock fields  | Fields absent                      | pgTAP        |
+| P3-CLOSE-01  | Completion    | COMPLETED stock take receives a new session           | Rejected                           | pgTAP        |
+| P3-REOPEN-01 | Reopen        | Non-Super-Admin or unallocated platform admin reopens | Forbidden                          | pgTAP        |
+| P3-REOPEN-02 | Reopen        | Missing reason or expired window                      | Rejected                           | pgTAP        |
+| P3-REOPEN-03 | Reopen        | Authorised reopen within window                       | Preserved and audited              | pgTAP        |
+| P3-REOPEN-04 | Reopen        | REOPENED skips recount/review                         | Rejected                           | pgTAP        |
 
 ## Mandatory later-phase matrix
 
 | Phase | Required coverage                                                                                                                                         |
 | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 3     | State transitions; one active stock take per warehouse; one active stock-taker session per user; completed rejection; reopen window/privilege/audit       |
 | 4     | Local-first save; UUID idempotency; restart recovery; partial batch failure; duplicate retry; two devices counting same product/type; no lost valid count |
 | 5     | High/medium/low/no-match recognition; wrong suggestion correction; offline cached search; 48-hour media cleanup and retry/failure reporting               |
 | 6     | Threshold precedence; progress capped at 100%; duplicate flags; blind recount data; concurrent recount claim; brand/item/user/pool allocation             |

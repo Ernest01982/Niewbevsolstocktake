@@ -174,6 +174,35 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          reopen_window_days: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          reopen_window_days?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          reopen_window_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_issues: {
         Row: {
           company_id: string
@@ -517,35 +546,138 @@ export type Database = {
           },
         ]
       }
-      stock_takes: {
+      stock_taker_sessions: {
         Row: {
           company_id: string
           created_at: string
+          ended_at: string | null
+          id: string
+          last_active_at: string
+          membership_role: Database["public"]["Enums"]["membership_role"]
+          started_at: string
+          status: Database["public"]["Enums"]["stock_taker_session_status"]
+          stock_take_id: string
+          updated_at: string
+          user_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          last_active_at?: string
+          membership_role?: Database["public"]["Enums"]["membership_role"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["stock_taker_session_status"]
+          stock_take_id: string
+          updated_at?: string
+          user_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          last_active_at?: string
+          membership_role?: Database["public"]["Enums"]["membership_role"]
+          started_at?: string
+          status?: Database["public"]["Enums"]["stock_taker_session_status"]
+          stock_take_id?: string
+          updated_at?: string
+          user_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_taker_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_taker_sessions_membership_fkey"
+            columns: [
+              "company_id",
+              "warehouse_id",
+              "user_id",
+              "membership_role",
+            ]
+            isOneToOne: false
+            referencedRelation: "warehouse_memberships"
+            referencedColumns: ["company_id", "warehouse_id", "user_id", "role"]
+          },
+          {
+            foreignKeyName: "stock_taker_sessions_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
+      stock_takes: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
           created_by: string
           id: string
+          ready_at: string | null
+          reopen_count: number
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          started_at: string | null
           status: Database["public"]["Enums"]["stock_take_status"]
           updated_at: string
           warehouse_id: string
         }
         Insert: {
           company_id: string
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string
           created_by: string
           id?: string
+          ready_at?: string | null
+          reopen_count?: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          started_at?: string | null
           status?: Database["public"]["Enums"]["stock_take_status"]
           updated_at?: string
           warehouse_id: string
         }
         Update: {
           company_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
           created_at?: string
           created_by?: string
           id?: string
+          ready_at?: string | null
+          reopen_count?: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          started_at?: string | null
           status?: Database["public"]["Enums"]["stock_take_status"]
           updated_at?: string
           warehouse_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_takes_company_completed_by_fkey"
+            columns: ["company_id", "completed_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
           {
             foreignKeyName: "stock_takes_company_creator_fkey"
             columns: ["company_id", "created_by"]
@@ -559,6 +691,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_takes_company_reopened_by_fkey"
+            columns: ["company_id", "reopened_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
           },
           {
             foreignKeyName: "stock_takes_warehouse_company_fkey"
@@ -660,6 +799,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_stock_take: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      create_stock_take: {
+        Args: { p_company_id: string; p_warehouse_id: string }
+        Returns: Json
+      }
+      end_stock_taker_session: { Args: { p_session_id: string }; Returns: Json }
+      get_stock_taker_context: { Args: never; Returns: Json }
       import_product_master: {
         Args: {
           p_column_mapping: Json
@@ -685,6 +838,47 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_stock_take_ready: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      move_stock_take_to_review: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      reopen_stock_take: {
+        Args: {
+          p_company_id: string
+          p_reason: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      start_stock_take: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      start_stock_taker_session: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       import_issue_disposition: "flagged" | "rejected"
@@ -705,6 +899,7 @@ export type Database = {
         | "REVIEW"
         | "COMPLETED"
         | "REOPENED"
+      stock_taker_session_status: "ACTIVE" | "ENDED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -852,6 +1047,7 @@ export const Constants = {
         "COMPLETED",
         "REOPENED",
       ],
+      stock_taker_session_status: ["ACTIVE", "ENDED"],
     },
   },
 } as const

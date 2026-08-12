@@ -1,12 +1,13 @@
 # AI Stock Take Control System
 
-Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the Phase 0 engineering foundation, Phase 1 tenancy/security foundation, and Phase 2 product/import data layer from the frozen build specification.
+Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, and stock-take lifecycle foundations through Phase 3 of the frozen build specification.
 
 ## Current scope
 
 - Phase 0: TypeScript/React PWA shell, environment validation, formatting, linting, tests, CI, typed Supabase client, and migration workflow.
 - Phase 1: companies, warehouses, profiles, memberships, deny-by-default RLS, audit foundation, development fixtures, and automated database security tests.
 - Phase 2: company-global brands/products, explicit source-column mapping, audited partial-row imports, row-level issues, and immutable warehouse/stock-take SOH snapshots.
+- Phase 3: database-enforced lifecycle transitions, READY validation, one active stock-taker session per user, safe session context, completion locking, and privileged recount-only reopen.
 - No counting, offline sync, variance, recount, recognition, or reporting workflow is implemented yet.
 
 ## Prerequisites
@@ -41,4 +42,4 @@ supabase/tests/database/   pgTAP schema, RLS, and immutability tests
 supabase/seed.sql          Deterministic local-only fixtures
 ```
 
-See `docs/architecture/phase-0-1-plan.md` and `docs/architecture/phase-2-plan.md` before extending the schema.
+See the phase plans in `docs/architecture/`, including `phase-3-plan.md`, before extending the schema.

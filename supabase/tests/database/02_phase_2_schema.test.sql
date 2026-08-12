@@ -82,13 +82,17 @@ select throws_ok(
 
 select lives_ok(
   $$
-    insert into public.stock_takes (id, company_id, warehouse_id, status, created_by)
+    insert into public.stock_takes (
+      id, company_id, warehouse_id, status, created_by, ready_at, started_at
+    )
     values (
       'a4000000-0000-4000-8000-000000000010',
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'a1000000-0000-4000-8000-000000000001',
       'ACTIVE',
-      '10000000-0000-4000-8000-000000000020'
+      '10000000-0000-4000-8000-000000000020',
+      now(),
+      now()
     )
   $$,
   'the first open stock take is allowed for a warehouse'
@@ -96,12 +100,16 @@ select lives_ok(
 
 select throws_ok(
   $$
-    insert into public.stock_takes (company_id, warehouse_id, status, created_by)
+    insert into public.stock_takes (
+      company_id, warehouse_id, status, created_by, ready_at, started_at
+    )
     values (
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       'a1000000-0000-4000-8000-000000000001',
       'REVIEW',
-      '10000000-0000-4000-8000-000000000020'
+      '10000000-0000-4000-8000-000000000020',
+      now(),
+      now()
     )
   $$,
   '23505'::character(5),
