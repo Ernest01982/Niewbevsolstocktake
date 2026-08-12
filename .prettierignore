@@ -1,0 +1,7 @@
+AI_Stock_Take_System_Build_Specification.docx
+apps/web/src/types/database.types.ts
+coverage/
+dist/
+node_modules/
+supabase/.branches/
+supabase/.temp/
