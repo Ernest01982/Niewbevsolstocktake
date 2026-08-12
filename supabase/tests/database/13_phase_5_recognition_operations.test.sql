@@ -132,7 +132,9 @@ select is((select jsonb_array_length(result -> 'items') from cleanup_claim), 1, 
 select is(public.complete_recognition_media_cleanup(
   (select (result ->> 'recognition_event_id')::uuid from media_result), false, 'fixture delete failure'
 ) ->> 'media_status', 'FAILED', 'failed media deletion is retained for retry');
+reset role;
 select is((select count(*)::integer from public.audit_logs where action = 'recognition_media.cleanup_failed'), 1, 'cleanup failure is surfaced in append-only audit');
+set local role service_role;
 select is(public.complete_recognition_media_cleanup(
   (select (result ->> 'recognition_event_id')::uuid from media_result), true, null
 ) ->> 'media_status', 'DELETED', 'successful retry marks media deleted');
