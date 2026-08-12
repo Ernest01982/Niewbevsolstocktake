@@ -156,7 +156,7 @@ select is((select count(*)::integer from public.stock_taker_sessions where statu
 
 create temporary table safe_context_result as select public.get_stock_taker_context() as result;
 select is((select result ->> 'success' from safe_context_result), 'true', 'stock taker context succeeds');
-select is((select result #>> '{stock_take,status}' from safe_context_result), 'ACTIVE', 'safe context includes countable lifecycle status');
+select is((select result #>> '{session,stock_take,status}' from safe_context_result), 'ACTIVE', 'safe context includes countable lifecycle status');
 select ok(
   (select result::text !~* 'quantity|snapshot|variance|soh' from safe_context_result),
   'safe context contains no SOH or variance fields'

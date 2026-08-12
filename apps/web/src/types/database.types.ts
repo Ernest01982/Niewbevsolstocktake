@@ -203,6 +203,178 @@ export type Database = {
           },
         ]
       }
+      count_flags: {
+        Row: {
+          company_id: string
+          count_id: string
+          created_at: string
+          flag_type: Database["public"]["Enums"]["count_flag_type"]
+          id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["count_flag_status"]
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          count_id: string
+          created_at?: string
+          flag_type: Database["public"]["Enums"]["count_flag_type"]
+          id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["count_flag_status"]
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          count_id?: string
+          created_at?: string
+          flag_type?: Database["public"]["Enums"]["count_flag_type"]
+          id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["count_flag_status"]
+          stock_take_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_flags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_flags_company_resolver_fkey"
+            columns: ["company_id", "resolved_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "count_flags_count_scope_fkey"
+            columns: ["count_id", "company_id", "warehouse_id", "stock_take_id"]
+            isOneToOne: false
+            referencedRelation: "counts"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+        ]
+      }
+      counts: {
+        Row: {
+          cases: number
+          company_id: string
+          count_type: Database["public"]["Enums"]["count_type"]
+          duration_ms: number | null
+          id: string
+          idempotency_key: string
+          layers: number
+          pallets: number
+          product_id: string
+          stock_take_id: string
+          stock_taker_session_id: string
+          submitted_at: string
+          submitted_by: string
+          total_units: number
+          units: number
+          warehouse_id: string
+        }
+        Insert: {
+          cases: number
+          company_id: string
+          count_type: Database["public"]["Enums"]["count_type"]
+          duration_ms?: number | null
+          id?: string
+          idempotency_key: string
+          layers: number
+          pallets: number
+          product_id: string
+          stock_take_id: string
+          stock_taker_session_id: string
+          submitted_at?: string
+          submitted_by: string
+          total_units: number
+          units: number
+          warehouse_id: string
+        }
+        Update: {
+          cases?: number
+          company_id?: string
+          count_type?: Database["public"]["Enums"]["count_type"]
+          duration_ms?: number | null
+          id?: string
+          idempotency_key?: string
+          layers?: number
+          pallets?: number
+          product_id?: string
+          stock_take_id?: string
+          stock_taker_session_id?: string
+          submitted_at?: string
+          submitted_by?: string
+          total_units?: number
+          units?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "counts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "counts_company_submitter_fkey"
+            columns: ["company_id", "submitted_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "counts_product_company_fkey"
+            columns: ["product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "counts_session_scope_fkey"
+            columns: [
+              "stock_taker_session_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "stock_taker_sessions"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+          {
+            foreignKeyName: "counts_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
       import_issues: {
         Row: {
           company_id: string
@@ -879,8 +1051,13 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_count: { Args: { p_record: Json }; Returns: Json }
+      sync_counts_batch: { Args: { p_records: Json }; Returns: Json }
     }
     Enums: {
+      count_flag_status: "OPEN" | "RESOLVED"
+      count_flag_type: "DUPLICATE_PRODUCT_COUNT_TYPE"
+      count_type: "BULK" | "PICK_FACE"
       import_issue_disposition: "flagged" | "rejected"
       import_job_status:
         | "processing"
@@ -1027,6 +1204,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      count_flag_status: ["OPEN", "RESOLVED"],
+      count_flag_type: ["DUPLICATE_PRODUCT_COUNT_TYPE"],
+      count_type: ["BULK", "PICK_FACE"],
       import_issue_disposition: ["flagged", "rejected"],
       import_job_status: [
         "processing",

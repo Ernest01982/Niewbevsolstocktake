@@ -1,6 +1,6 @@
 # AI Stock Take Control System
 
-Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, and stock-take lifecycle foundations through Phase 3 of the frozen build specification.
+Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, and offline counting foundations through Phase 4 of the frozen build specification.
 
 ## Current scope
 
@@ -8,7 +8,8 @@ Version 1 is an offline-first, multi-company stock-taking SaaS. This repository 
 - Phase 1: companies, warehouses, profiles, memberships, deny-by-default RLS, audit foundation, development fixtures, and automated database security tests.
 - Phase 2: company-global brands/products, explicit source-column mapping, audited partial-row imports, row-level issues, and immutable warehouse/stock-take SOH snapshots.
 - Phase 3: database-enforced lifecycle transitions, READY validation, one active stock-taker session per user, safe session context, completion locking, and privileged recount-only reopen.
-- No counting, offline sync, variance, recount, recognition, or reporting workflow is implemented yet.
+- Phase 4: immutable Bulk/Pick Face counts, canonical packaging calculation, IndexedDB product cache and durable queue, idempotent per-record sync, duplicate warnings/flags, and the mobile stock-taker counting flow.
+- Recognition, variance, recount, and reporting workflows are not implemented yet.
 
 ## Prerequisites
 
@@ -42,4 +43,4 @@ supabase/tests/database/   pgTAP schema, RLS, and immutability tests
 supabase/seed.sql          Deterministic local-only fixtures
 ```
 
-See the phase plans in `docs/architecture/`, including `phase-3-plan.md`, before extending the schema.
+See the phase plans in `docs/architecture/`, including `phase-4-plan.md`, before extending the schema.
