@@ -6,5 +6,26 @@ const databaseTypesUrl = new URL(
   import.meta.url,
 );
 const generatedTypes = await readFile(databaseTypesUrl, 'utf8');
+const stableTypeLines = generatedTypes.replaceAll('\r\n', '\n').split('\n');
+const internalMetadataStart = stableTypeLines.findIndex((line) =>
+  line.includes('Allows to automatically instantiate createClient'),
+);
 
-await writeFile(databaseTypesUrl, generatedTypes.trimEnd() + '\n', 'utf8');
+if (internalMetadataStart >= 0) {
+  const publicSchemaStart = stableTypeLines.findIndex(
+    (line, index) => index > internalMetadataStart && line === '  public: {',
+  );
+
+  if (publicSchemaStart < 0) {
+    throw new Error('Generated database types are missing the public schema.');
+  }
+
+  stableTypeLines.splice(
+    internalMetadataStart,
+    publicSchemaStart - internalMetadataStart,
+  );
+}
+
+const stableTypes = stableTypeLines.join('\n');
+
+await writeFile(databaseTypesUrl, stableTypes.trimEnd() + '\n', 'utf8');

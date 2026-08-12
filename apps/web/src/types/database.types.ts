@@ -67,6 +67,44 @@ export type Database = {
           },
         ]
       }
+      brands: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          normalized_name: string | null
+          status: Database["public"]["Enums"]["record_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          normalized_name?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_name?: string | null
+          status?: Database["public"]["Enums"]["record_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brands_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string
@@ -136,6 +174,241 @@ export type Database = {
           },
         ]
       }
+      import_issues: {
+        Row: {
+          company_id: string
+          created_at: string
+          disposition: Database["public"]["Enums"]["import_issue_disposition"]
+          field_name: string | null
+          id: string
+          import_job_id: string
+          issue_code: string
+          message: string
+          raw_row: Json
+          row_number: number
+          stock_take_id: string | null
+          warehouse_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          disposition: Database["public"]["Enums"]["import_issue_disposition"]
+          field_name?: string | null
+          id?: string
+          import_job_id: string
+          issue_code: string
+          message: string
+          raw_row: Json
+          row_number: number
+          stock_take_id?: string | null
+          warehouse_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          disposition?: Database["public"]["Enums"]["import_issue_disposition"]
+          field_name?: string | null
+          id?: string
+          import_job_id?: string
+          issue_code?: string
+          message?: string
+          raw_row?: Json
+          row_number?: number
+          stock_take_id?: string | null
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_issues_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_issues_job_company_fkey"
+            columns: ["import_job_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "import_issues_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+          {
+            foreignKeyName: "import_issues_warehouse_company_fkey"
+            columns: ["warehouse_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      import_jobs: {
+        Row: {
+          accepted_rows: number
+          column_mapping: Json
+          company_id: string
+          completed_at: string | null
+          created_by: string
+          flagged_rows: number
+          id: string
+          kind: Database["public"]["Enums"]["import_kind"]
+          rejected_rows: number
+          snapshot_as_of: string | null
+          source_filename: string
+          source_metadata: Json
+          source_sha256: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["import_job_status"]
+          stock_take_id: string | null
+          total_rows: number
+          warehouse_id: string | null
+        }
+        Insert: {
+          accepted_rows?: number
+          column_mapping: Json
+          company_id: string
+          completed_at?: string | null
+          created_by: string
+          flagged_rows?: number
+          id?: string
+          kind: Database["public"]["Enums"]["import_kind"]
+          rejected_rows?: number
+          snapshot_as_of?: string | null
+          source_filename: string
+          source_metadata?: Json
+          source_sha256?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["import_job_status"]
+          stock_take_id?: string | null
+          total_rows?: number
+          warehouse_id?: string | null
+        }
+        Update: {
+          accepted_rows?: number
+          column_mapping?: Json
+          company_id?: string
+          completed_at?: string | null
+          created_by?: string
+          flagged_rows?: number
+          id?: string
+          kind?: Database["public"]["Enums"]["import_kind"]
+          rejected_rows?: number
+          snapshot_as_of?: string | null
+          source_filename?: string
+          source_metadata?: Json
+          source_sha256?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["import_job_status"]
+          stock_take_id?: string | null
+          total_rows?: number
+          warehouse_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_company_creator_fkey"
+            columns: ["company_id", "created_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "import_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+          {
+            foreignKeyName: "import_jobs_warehouse_company_fkey"
+            columns: ["warehouse_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          barcode: string | null
+          brand_id: string | null
+          cases_per_layer: number | null
+          cases_per_pallet: number | null
+          company_id: string
+          created_at: string
+          id: string
+          name: string
+          normalized_barcode: string | null
+          normalized_name: string | null
+          normalized_product_code: string | null
+          product_code: string
+          status: Database["public"]["Enums"]["record_status"]
+          units_per_case: number | null
+          updated_at: string
+        }
+        Insert: {
+          barcode?: string | null
+          brand_id?: string | null
+          cases_per_layer?: number | null
+          cases_per_pallet?: number | null
+          company_id: string
+          created_at?: string
+          id?: string
+          name: string
+          normalized_barcode?: string | null
+          normalized_name?: string | null
+          normalized_product_code?: string | null
+          product_code: string
+          status?: Database["public"]["Enums"]["record_status"]
+          units_per_case?: number | null
+          updated_at?: string
+        }
+        Update: {
+          barcode?: string | null
+          brand_id?: string | null
+          cases_per_layer?: number | null
+          cases_per_pallet?: number | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          normalized_barcode?: string | null
+          normalized_name?: string | null
+          normalized_product_code?: string | null
+          product_code?: string
+          status?: Database["public"]["Enums"]["record_status"]
+          units_per_case?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_brand_company_fkey"
+            columns: ["brand_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -162,6 +435,139 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      stock_snapshot_lines: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          import_job_id: string
+          product_id: string
+          quantity_on_hand: number
+          snapshot_as_of: string
+          source_row: Json
+          source_row_number: number
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          import_job_id: string
+          product_id: string
+          quantity_on_hand: number
+          snapshot_as_of: string
+          source_row: Json
+          source_row_number: number
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          import_job_id?: string
+          product_id?: string
+          quantity_on_hand?: number
+          snapshot_as_of?: string
+          source_row?: Json
+          source_row_number?: number
+          stock_take_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_snapshot_lines_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_snapshot_lines_import_job_scope_fkey"
+            columns: [
+              "import_job_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "import_jobs"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+          {
+            foreignKeyName: "stock_snapshot_lines_product_company_fkey"
+            columns: ["product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "stock_snapshot_lines_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
+      stock_takes: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          id: string
+          status: Database["public"]["Enums"]["stock_take_status"]
+          updated_at: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          status?: Database["public"]["Enums"]["stock_take_status"]
+          updated_at?: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          status?: Database["public"]["Enums"]["stock_take_status"]
+          updated_at?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_takes_company_creator_fkey"
+            columns: ["company_id", "created_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "stock_takes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_takes_warehouse_company_fkey"
+            columns: ["warehouse_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
       }
       warehouse_memberships: {
         Row: {
@@ -254,12 +660,51 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      import_product_master: {
+        Args: {
+          p_column_mapping: Json
+          p_company_id: string
+          p_rows: Json
+          p_source_filename: string
+          p_source_metadata?: Json
+          p_source_sha256: string
+        }
+        Returns: Json
+      }
+      import_stock_snapshot: {
+        Args: {
+          p_column_mapping: Json
+          p_company_id: string
+          p_rows: Json
+          p_snapshot_as_of: string
+          p_source_filename: string
+          p_source_metadata?: Json
+          p_source_sha256: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
+      import_issue_disposition: "flagged" | "rejected"
+      import_job_status:
+        | "processing"
+        | "completed"
+        | "completed_with_issues"
+        | "failed"
+      import_kind: "product_master" | "stock_snapshot"
       membership_role: "super_admin" | "admin" | "manager" | "stock_taker"
       platform_role: "super_admin"
       record_status: "active" | "inactive"
+      stock_take_status:
+        | "DRAFT"
+        | "READY"
+        | "ACTIVE"
+        | "RECOUNT"
+        | "REVIEW"
+        | "COMPLETED"
+        | "REOPENED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -387,9 +832,26 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      import_issue_disposition: ["flagged", "rejected"],
+      import_job_status: [
+        "processing",
+        "completed",
+        "completed_with_issues",
+        "failed",
+      ],
+      import_kind: ["product_master", "stock_snapshot"],
       membership_role: ["super_admin", "admin", "manager", "stock_taker"],
       platform_role: ["super_admin"],
       record_status: ["active", "inactive"],
+      stock_take_status: [
+        "DRAFT",
+        "READY",
+        "ACTIVE",
+        "RECOUNT",
+        "REVIEW",
+        "COMPLETED",
+        "REOPENED",
+      ],
     },
   },
 } as const

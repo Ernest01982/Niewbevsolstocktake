@@ -70,3 +70,94 @@ values
   ('aa000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null, '10000000-0000-4000-8000-000000000001', 'company.created', 'company', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '{"fixture":true}'),
   ('aa000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000010', 'warehouse.allocated', 'warehouse', 'a1000000-0000-4000-8000-000000000001', '{"fixture":true}'),
   ('bb000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000040', 'warehouse.allocated', 'warehouse', 'b1000000-0000-4000-8000-000000000001', '{"fixture":true}');
+
+insert into public.brands (id, company_id, name)
+values
+  ('a2000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Company A Brand'),
+  ('b2000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Company B Brand');
+
+insert into public.products (
+  id,
+  company_id,
+  brand_id,
+  product_code,
+  name,
+  barcode,
+  units_per_case,
+  cases_per_layer,
+  cases_per_pallet
+)
+values
+  ('a3000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a2000000-0000-4000-8000-000000000001', 'A-001', 'Company A Product One', '6000000000001', 12, 10, 60),
+  ('a3000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a2000000-0000-4000-8000-000000000001', 'A-002', 'Company A Product Two', '6000000000002', null, null, null),
+  ('b3000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b2000000-0000-4000-8000-000000000001', 'B-001', 'Company B Product One', '7000000000001', 6, 8, 48);
+
+insert into public.stock_takes (
+  id,
+  company_id,
+  warehouse_id,
+  status,
+  created_by
+)
+values
+  ('a4000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000020'),
+  ('a4000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000002', 'COMPLETED', '10000000-0000-4000-8000-000000000001'),
+  ('b4000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', 'DRAFT', '10000000-0000-4000-8000-000000000040');
+
+insert into public.import_jobs (
+  id,
+  company_id,
+  warehouse_id,
+  stock_take_id,
+  kind,
+  status,
+  source_filename,
+  source_metadata,
+  column_mapping,
+  snapshot_as_of,
+  total_rows,
+  accepted_rows,
+  flagged_rows,
+  rejected_rows,
+  created_by,
+  completed_at
+)
+values
+  ('a5000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null, null, 'product_master', 'completed', 'company-a-products.csv', '{"fixture":true}', '{"product_code":"Code","name":"Description"}', null, 2, 2, 0, 0, '10000000-0000-4000-8000-000000000010', now()),
+  ('a5000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 'stock_snapshot', 'completed_with_issues', 'company-a-jhb-soh.csv', '{"fixture":true}', '{"product_code":"Item","quantity_on_hand":"SOH"}', '2026-08-12T08:00:00+02:00', 2, 1, 0, 1, '10000000-0000-4000-8000-000000000020', now()),
+  ('a5000000-0000-4000-8000-000000000003', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000002', 'a4000000-0000-4000-8000-000000000002', 'stock_snapshot', 'completed', 'company-a-cpt-soh.csv', '{"fixture":true}', '{"product_code":"Item","quantity_on_hand":"SOH"}', '2026-08-01T08:00:00+02:00', 1, 1, 0, 0, '10000000-0000-4000-8000-000000000001', now()),
+  ('b5000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', null, null, 'product_master', 'completed', 'company-b-products.csv', '{"fixture":true}', '{"product_code":"Code","name":"Description"}', null, 1, 1, 0, 0, '10000000-0000-4000-8000-000000000040', now()),
+  ('b5000000-0000-4000-8000-000000000002', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', 'b4000000-0000-4000-8000-000000000001', 'stock_snapshot', 'completed', 'company-b-jhb-soh.csv', '{"fixture":true}', '{"product_code":"Item","quantity_on_hand":"SOH"}', '2026-08-12T08:00:00+02:00', 1, 1, 0, 0, '10000000-0000-4000-8000-000000000040', now());
+
+insert into public.import_issues (
+  id,
+  company_id,
+  warehouse_id,
+  stock_take_id,
+  import_job_id,
+  row_number,
+  disposition,
+  issue_code,
+  field_name,
+  message,
+  raw_row
+)
+values
+  ('a6000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000002', 2, 'rejected', 'product_not_found', 'product_code', 'Fixture rejected row.', '{"Item":"UNKNOWN","SOH":"5"}');
+
+insert into public.stock_snapshot_lines (
+  id,
+  company_id,
+  warehouse_id,
+  stock_take_id,
+  product_id,
+  import_job_id,
+  quantity_on_hand,
+  source_row_number,
+  source_row,
+  snapshot_as_of
+)
+values
+  ('a7000000-0000-4000-8000-000000000001', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 'a3000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000002', 720, 1, '{"Item":"A-001","SOH":"720"}', '2026-08-12T08:00:00+02:00'),
+  ('a7000000-0000-4000-8000-000000000002', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'a1000000-0000-4000-8000-000000000002', 'a4000000-0000-4000-8000-000000000002', 'a3000000-0000-4000-8000-000000000002', 'a5000000-0000-4000-8000-000000000003', 0, 1, '{"Item":"A-002","SOH":"0"}', '2026-08-01T08:00:00+02:00'),
+  ('b7000000-0000-4000-8000-000000000001', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'b1000000-0000-4000-8000-000000000001', 'b4000000-0000-4000-8000-000000000001', 'b3000000-0000-4000-8000-000000000001', 'b5000000-0000-4000-8000-000000000002', 96, 1, '{"Item":"B-001","SOH":"96"}', '2026-08-12T08:00:00+02:00');
