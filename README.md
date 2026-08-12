@@ -1,6 +1,6 @@
 # AI Stock Take Control System
 
-Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, and offline counting foundations through Phase 4 of the frozen build specification.
+Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, offline counting, and AI-recognition foundations through Phase 5 of the frozen build specification.
 
 ## Current scope
 
@@ -9,7 +9,8 @@ Version 1 is an offline-first, multi-company stock-taking SaaS. This repository 
 - Phase 2: company-global brands/products, explicit source-column mapping, audited partial-row imports, row-level issues, and immutable warehouse/stock-take SOH snapshots.
 - Phase 3: database-enforced lifecycle transitions, READY validation, one active stock-taker session per user, safe session context, completion locking, and privileged recount-only reopen.
 - Phase 4: immutable Bulk/Pick Face counts, canonical packaging calculation, IndexedDB product cache and durable queue, idempotent per-record sync, duplicate warnings/flags, and the mobile stock-taker counting flow.
-- Recognition, variance, recount, and reporting workflows are not implemented yet.
+- Phase 5: live camera capture, provider abstraction, database-owned confidence tiers, candidate confirmation, durable offline manual-selection logs, private transient recognition media, and Vault-authenticated cleanup.
+- Variance, recount, and reporting workflows are not implemented yet.
 
 ## Prerequisites
 
@@ -39,8 +40,9 @@ docs/architecture/         Phase plans and architecture decisions
 docs/security/             RLS and trust-boundary design
 docs/testing/              Acceptance and automated-test matrix
 supabase/migrations/       Ordered database migrations
+supabase/functions/        Recognition provider adapter and cleanup worker
 supabase/tests/database/   pgTAP schema, RLS, and immutability tests
 supabase/seed.sql          Deterministic local-only fixtures
 ```
 
-See the phase plans in `docs/architecture/`, including `phase-4-plan.md`, before extending the schema.
+See the phase plans in `docs/architecture/`, including `phase-5-plan.md`, before extending the schema.

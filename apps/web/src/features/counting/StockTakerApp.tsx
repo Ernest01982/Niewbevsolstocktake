@@ -12,13 +12,22 @@ import {
 import {
   cacheProducts,
   countPendingRecords,
+  enqueueManualRecognition,
   enqueueCount,
   hasLocalDuplicate,
+  recoverInterruptedRecognitions,
   recoverInterruptedCounts,
   searchCachedProducts,
 } from '../offline/database';
 import { syncPendingCounts } from '../offline/sync';
 import { sendCountBatchToSupabase } from '../offline/supabaseSync';
+import { CameraCapture } from '../recognition/CameraCapture';
+import {
+  confirmRecognition,
+  recognizeProduct,
+  syncPendingRecognitions,
+  type RecognitionResult,
+} from '../recognition/recognition';
 
 type Connectivity = 'Offline' | 'Online' | 'Syncing';
 
@@ -220,6 +229,9 @@ function CountingScreen({ active }: { active: ActiveSession }) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [recognizing, setRecognizing] = useState(false);
+  const [recognition, setRecognition] = useState<RecognitionResult>();
   const countStartedAt = useRef<number | null>(null);
 
   const refreshPending = useCallback(async () => {
@@ -233,7 +245,10 @@ function CountingScreen({ active }: { active: ActiveSession }) {
       return;
     }
     setConnectivity('Syncing');
-    await syncPendingCounts(sendCountBatchToSupabase);
+    await Promise.all([
+      syncPendingCounts(sendCountBatchToSupabase),
+      syncPendingRecognitions(),
+    ]);
     setConnectivity(navigator.onLine ? 'Online' : 'Offline');
     await refreshPending();
   }, [refreshPending]);
@@ -242,6 +257,7 @@ function CountingScreen({ active }: { active: ActiveSession }) {
     let cancelled = false;
     async function prepareOfflineData() {
       await recoverInterruptedCounts();
+      await recoverInterruptedRecognitions();
       await refreshPending();
       if (navigator.onLine) {
         try {
@@ -303,7 +319,41 @@ function CountingScreen({ active }: { active: ActiveSession }) {
     }
   }, [inputs, selectedProduct]);
 
-  function chooseProduct(product: CachedProduct) {
+  async function chooseProduct(
+    product: CachedProduct,
+    recognitionMethod?: 'AUTO_PRESELECT' | 'CANDIDATE_CONFIRMATION',
+  ) {
+    setError('');
+    try {
+      if (recognition) {
+        await confirmRecognition(
+          recognition.recognition_event_id,
+          product.id,
+          recognitionMethod ?? 'MANUAL_SEARCH',
+        );
+      } else {
+        await enqueueManualRecognition({
+          candidates: [],
+          captured_at: new Date().toISOString(),
+          company_id: active.company.id,
+          idempotency_key: crypto.randomUUID(),
+          model: 'cached-products-v1',
+          provider: 'offline_manual_cache',
+          selected_product_id: product.id,
+          selection_method: 'MANUAL_SEARCH',
+          stock_take_id: active.stock_take.id,
+          stock_taker_session_id: active.id,
+          warehouse_id: active.warehouse.id,
+        });
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'The product confirmation could not be saved.',
+      );
+      return;
+    }
     setSelectedProduct(product);
     setQuery('');
     setProducts([]);
@@ -311,7 +361,35 @@ function CountingScreen({ active }: { active: ActiveSession }) {
     setError('');
     setMessage('');
     setDuplicateWarning(false);
+    setRecognition(undefined);
     countStartedAt.current = nowMs();
+    await refreshPending();
+    if (navigator.onLine) void synchronize();
+  }
+
+  async function captureAndRecognize(image: Blob) {
+    setRecognizing(true);
+    setError('');
+    try {
+      const result = await recognizeProduct(active.company.id, image);
+      setRecognition(result);
+      setCameraOpen(false);
+      if (result.confidence_tier === 'LOW') {
+        setMessage(
+          'Confidence was low. Confirm the product with manual search.',
+        );
+      } else if (result.confidence_tier === 'NO_MATCH') {
+        setMessage('No reliable match was found. Use manual search.');
+      } else {
+        setMessage('');
+      }
+    } catch (caught) {
+      setCameraOpen(false);
+      setMessage('Recognition is unavailable. Manual cached search is ready.');
+      setError(caught instanceof Error ? caught.message : '');
+    } finally {
+      setRecognizing(false);
+    }
   }
 
   async function submit(event: React.FormEvent) {
@@ -356,6 +434,7 @@ function CountingScreen({ active }: { active: ActiveSession }) {
       setInputs(emptyInputs);
       setQuery('');
       setDuplicateWarning(false);
+      setRecognition(undefined);
       await refreshPending();
       if (navigator.onLine) void synchronize();
     } catch (caught) {
@@ -383,11 +462,58 @@ function CountingScreen({ active }: { active: ActiveSession }) {
       {!selectedProduct ? (
         <section className="count-card">
           <p className="step-label">Next product</p>
-          <h2>Search the product cache</h2>
+          <h2>Recognise or search</h2>
           <p className="muted-copy">
-            Camera recognition arrives in Phase 5. Typed search works offline
-            now.
+            Recognition works online. Cached product search remains available
+            offline at all times.
           </p>
+          <button
+            className="camera-button"
+            disabled={connectivity === 'Offline'}
+            onClick={() => {
+              setError('');
+              setRecognition(undefined);
+              setCameraOpen(true);
+            }}
+            type="button"
+          >
+            <span aria-hidden="true">▣</span>
+            {connectivity === 'Offline'
+              ? 'Camera recognition needs a connection'
+              : 'Open live camera'}
+          </button>
+          {recognition &&
+            (recognition.confidence_tier === 'HIGH' ||
+              recognition.confidence_tier === 'MEDIUM') && (
+              <div className="recognition-results">
+                <p className="step-label">
+                  {recognition.confidence_tier === 'HIGH'
+                    ? 'Likely match'
+                    : 'Confirm one of these'}
+                </p>
+                {recognition.candidates.map((candidate, index) => (
+                  <button
+                    className={index === 0 ? 'candidate-primary' : ''}
+                    key={candidate.product.id}
+                    onClick={() =>
+                      void chooseProduct(
+                        candidate.product,
+                        recognition.confidence_tier === 'HIGH'
+                          ? 'AUTO_PRESELECT'
+                          : 'CANDIDATE_CONFIRMATION',
+                      )
+                    }
+                    type="button"
+                  >
+                    <strong>{candidate.product.name}</strong>
+                    <span>
+                      {candidate.product.product_code} ·{' '}
+                      {Math.round(candidate.confidence * 100)}% match
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           <label className="search-label">
             Product code, name or barcode
             <input
@@ -402,7 +528,7 @@ function CountingScreen({ active }: { active: ActiveSession }) {
             {products.map((product) => (
               <button
                 key={product.id}
-                onClick={() => chooseProduct(product)}
+                onClick={() => void chooseProduct(product)}
                 type="button"
               >
                 <strong>{product.name}</strong>
@@ -484,6 +610,13 @@ function CountingScreen({ active }: { active: ActiveSession }) {
             Save count &amp; next product
           </button>
         </form>
+      )}
+      {cameraOpen && (
+        <CameraCapture
+          busy={recognizing}
+          onCapture={captureAndRecognize}
+          onClose={() => setCameraOpen(false)}
+        />
       )}
     </main>
   );

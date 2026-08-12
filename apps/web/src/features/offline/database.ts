@@ -5,9 +5,10 @@ import type {
 } from '../counting/count';
 
 const DATABASE_NAME = 'stock-take-offline-v1';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const PRODUCT_STORE = 'products';
 const COUNT_STORE = 'counts';
+const RECOGNITION_STORE = 'recognition-events';
 
 export type LocalCountStatus = 'acknowledged' | 'failed' | 'queued' | 'syncing';
 
@@ -29,6 +30,29 @@ export interface LocalCountRecord extends CountQuantities {
   stock_take_id: string;
   stock_taker_session_id: string;
   total_units: number;
+  warehouse_id: string;
+}
+
+export type LocalRecognitionStatus =
+  'acknowledged' | 'failed' | 'queued' | 'syncing';
+
+export interface LocalRecognitionRecord {
+  acknowledged_at?: string;
+  attempts: number;
+  candidates: { confidence: number; product_id: string }[];
+  captured_at: string;
+  company_id: string;
+  idempotency_key: string;
+  last_error?: string;
+  model: string;
+  next_attempt_at: number;
+  provider: string;
+  recognition_event_id?: string;
+  selected_product_id: string;
+  selection_method: 'MANUAL_SEARCH';
+  status: LocalRecognitionStatus;
+  stock_take_id: string;
+  stock_taker_session_id: string;
   warehouse_id: string;
 }
 
@@ -73,8 +97,28 @@ async function openDatabase(): Promise<IDBDatabase> {
       counts.createIndex('status', 'status');
       counts.createIndex('stock_take_id', 'stock_take_id');
     }
+    if (!database.objectStoreNames.contains(RECOGNITION_STORE)) {
+      const recognitionEvents = database.createObjectStore(RECOGNITION_STORE, {
+        keyPath: 'idempotency_key',
+      });
+      recognitionEvents.createIndex('status', 'status');
+    }
   };
   return requestResult(request);
+}
+
+export async function getCachedProductsByIds(
+  companyId: string,
+  productIds: string[],
+): Promise<CachedProduct[]> {
+  if (productIds.length === 0) return [];
+  const wanted = new Set(productIds);
+  const products = await searchCachedProducts(companyId, '', 10_000);
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return productIds.flatMap((id) => {
+    const product = byId.get(id);
+    return product && wanted.has(id) ? [product] : [];
+  });
 }
 
 export async function cacheProducts(products: CachedProduct[]): Promise<void> {
@@ -167,6 +211,128 @@ export async function recoverInterruptedCounts(): Promise<number> {
   return recovered;
 }
 
+export async function enqueueManualRecognition(
+  record: Omit<
+    LocalRecognitionRecord,
+    'attempts' | 'next_attempt_at' | 'status'
+  >,
+): Promise<LocalRecognitionRecord> {
+  const database = await openDatabase();
+  const transaction = database.transaction(RECOGNITION_STORE, 'readwrite');
+  const store = transaction.objectStore(RECOGNITION_STORE);
+  const existing = await requestResult<LocalRecognitionRecord | undefined>(
+    store.get(record.idempotency_key),
+  );
+  const queued: LocalRecognitionRecord = existing ?? {
+    ...record,
+    attempts: 0,
+    next_attempt_at: 0,
+    status: 'queued',
+  };
+  if (!existing) store.add(queued);
+  await transactionComplete(transaction);
+  database.close();
+  return queued;
+}
+
+export async function recoverInterruptedRecognitions(): Promise<number> {
+  const database = await openDatabase();
+  const transaction = database.transaction(RECOGNITION_STORE, 'readwrite');
+  const store = transaction.objectStore(RECOGNITION_STORE);
+  const records = (await requestResult(
+    store.getAll(),
+  )) as LocalRecognitionRecord[];
+  let recovered = 0;
+  for (const record of records) {
+    if (record.status === 'syncing') {
+      store.put({ ...record, status: 'queued' });
+      recovered += 1;
+    }
+  }
+  await transactionComplete(transaction);
+  database.close();
+  return recovered;
+}
+
+export async function listSyncableRecognitions(
+  now = Date.now(),
+  limit = 50,
+): Promise<LocalRecognitionRecord[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction(RECOGNITION_STORE, 'readonly');
+  const records = (await requestResult(
+    transaction.objectStore(RECOGNITION_STORE).getAll(),
+  )) as LocalRecognitionRecord[];
+  await transactionComplete(transaction);
+  database.close();
+  return records
+    .filter(
+      (record) =>
+        record.status === 'queued' ||
+        (record.status === 'failed' && record.next_attempt_at <= now),
+    )
+    .sort((left, right) => left.captured_at.localeCompare(right.captured_at))
+    .slice(0, limit);
+}
+
+async function updateRecognitions(
+  keys: string[],
+  update: (record: LocalRecognitionRecord) => LocalRecognitionRecord,
+): Promise<void> {
+  if (keys.length === 0) return;
+  const database = await openDatabase();
+  const transaction = database.transaction(RECOGNITION_STORE, 'readwrite');
+  const store = transaction.objectStore(RECOGNITION_STORE);
+  for (const key of keys) {
+    const record = await requestResult<LocalRecognitionRecord | undefined>(
+      store.get(key),
+    );
+    if (record) store.put(update(record));
+  }
+  await transactionComplete(transaction);
+  database.close();
+}
+
+export async function markRecognitionsSyncing(keys: string[]): Promise<void> {
+  await updateRecognitions(keys, (record) => ({
+    ...record,
+    status: 'syncing',
+  }));
+}
+
+export async function acknowledgeRecognition(
+  key: string,
+  recognitionEventId: string,
+): Promise<void> {
+  await updateRecognitions([key], (record) => {
+    const acknowledged: LocalRecognitionRecord = {
+      ...record,
+      acknowledged_at: new Date().toISOString(),
+      recognition_event_id: recognitionEventId,
+      status: 'acknowledged',
+    };
+    delete acknowledged.last_error;
+    return acknowledged;
+  });
+}
+
+export async function failRecognition(
+  key: string,
+  message: string,
+  now = Date.now(),
+): Promise<void> {
+  await updateRecognitions([key], (record) => {
+    const attempts = record.attempts + 1;
+    return {
+      ...record,
+      attempts,
+      last_error: message,
+      next_attempt_at: now + retryDelayMs(attempts),
+      status: 'failed',
+    };
+  });
+}
+
 export async function listSyncableCounts(
   now = Date.now(),
   limit = 50,
@@ -250,13 +416,23 @@ export async function failCount(
 
 export async function countPendingRecords(): Promise<number> {
   const database = await openDatabase();
-  const transaction = database.transaction(COUNT_STORE, 'readonly');
-  const records = (await requestResult(
+  const transaction = database.transaction(
+    [COUNT_STORE, RECOGNITION_STORE],
+    'readonly',
+  );
+  const countRecords = (await requestResult(
     transaction.objectStore(COUNT_STORE).getAll(),
   )) as LocalCountRecord[];
+  const recognitionRecords = (await requestResult(
+    transaction.objectStore(RECOGNITION_STORE).getAll(),
+  )) as LocalRecognitionRecord[];
   await transactionComplete(transaction);
   database.close();
-  return records.filter((record) => record.status !== 'acknowledged').length;
+  return (
+    countRecords.filter((record) => record.status !== 'acknowledged').length +
+    recognitionRecords.filter((record) => record.status !== 'acknowledged')
+      .length
+  );
 }
 
 export async function hasLocalDuplicate(

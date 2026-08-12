@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   cacheProducts,
   countPendingRecords,
+  enqueueManualRecognition,
   enqueueCount,
   getLocalCount,
   hasLocalDuplicate,
   markCountsSyncing,
+  markRecognitionsSyncing,
   recoverInterruptedCounts,
+  recoverInterruptedRecognitions,
   resetOfflineDatabaseForTests,
   searchCachedProducts,
+  listSyncableRecognitions,
 } from './database';
 import { syncPendingCounts } from './sync';
 
@@ -146,5 +150,33 @@ describe('offline database', () => {
       (await searchCachedProducts(baseCount.company_id, '6001'))[0]
         ?.product_code,
     ).toBe('WATER-1');
+  });
+});
+
+describe('durable offline recognition queue', () => {
+  it('recovers a manual recognition event after an interrupted sync', async () => {
+    const event = await enqueueManualRecognition({
+      candidates: [],
+      captured_at: '2026-08-12T10:00:00.000Z',
+      company_id: 'company-a',
+      idempotency_key: 'recognition-1',
+      model: 'cached-products-v1',
+      provider: 'offline_manual_cache',
+      selected_product_id: 'product-a',
+      selection_method: 'MANUAL_SEARCH',
+      stock_take_id: 'take-a',
+      stock_taker_session_id: 'session-a',
+      warehouse_id: 'warehouse-a',
+    });
+    await markRecognitionsSyncing([event.idempotency_key]);
+
+    expect(await recoverInterruptedRecognitions()).toBe(1);
+    expect(await listSyncableRecognitions()).toEqual([
+      expect.objectContaining({
+        idempotency_key: 'recognition-1',
+        status: 'queued',
+      }),
+    ]);
+    expect(await countPendingRecords()).toBe(1);
   });
 });

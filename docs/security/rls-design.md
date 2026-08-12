@@ -1,4 +1,4 @@
-# Phase 1 through Phase 4 RLS design
+# Phase 1 through Phase 5 RLS design
 
 ## Trust boundaries
 
@@ -31,16 +31,21 @@ No helper trusts user metadata or client-provided role claims.
 | `stock_taker_sessions`          | Authorised company warehouses                       | Allocated warehouses                             | Allocated warehouse                       | Own sessions only         |
 | `counts`                        | Authorised company warehouses                       | Allocated warehouses                             | Allocated warehouse                       | Own submitted counts      |
 | `count_flags`                   | Authorised company warehouses                       | Allocated warehouses                             | Allocated warehouse                       | Denied                    |
+| `recognition_events`            | Authorised company warehouses                       | Allocated warehouses                             | Allocated warehouse                       | Own events only           |
 
 An inactive company membership invalidates all access beneath it. An inactive warehouse membership invalidates warehouse-scoped access.
 
 ## Mutations
 
-Phases 1 through 4 grant no direct INSERT, UPDATE, or DELETE access to the frontend for tenant, membership, product, import, snapshot, lifecycle, session, count, flag, or audit tables. Development fixtures run as the database owner. Imports, lifecycle actions, and count sync call narrow transactional functions with actor, scope, validation, concurrency, idempotency, and audit behavior tested together.
+Phases 1 through 5 grant no direct INSERT, UPDATE, or DELETE access to the frontend for tenant, membership, product, import, snapshot, lifecycle, session, count, flag, recognition, or audit tables. Development fixtures run as the database owner. Imports, lifecycle actions, count sync, and recognition operations call narrow transactional functions with actor, scope, validation, concurrency, idempotency, and audit behavior tested together.
 
 The import and lifecycle RPCs are deliberate exceptions to the rule that security-definer helpers remain outside `public`: PostgREST must expose these named server operations. They use an empty search path, fully qualified objects, explicit permanent-user membership checks, structured errors, and immediate `PUBLIC`/`anon` EXECUTE revocation. Only `authenticated` receives EXECUTE; direct table writes remain denied.
 
 Audit rows have both privilege denial and a trigger that rejects UPDATE/DELETE. The trigger provides defense in depth for future privileged code that accidentally attempts mutation.
+
+Recognition events are created and confirmed only through authenticated RPCs that verify the caller's active Stock Taker session. Candidate products are revalidated against the company product master, sorted by the database, and limited to three. Stock Takers may read only their own events. Media-cleanup mutation RPCs are service-role only.
+
+The `recognition-media` Storage bucket is private. Browser roles receive no direct object grants or permissive Storage policies. Edge Functions use server context only after user JWT validation for recognition. Scheduled cleanup is authenticated with a random Vault token; its verification RPC is executable only by `service_role`, and the token is compared by digest without being returned.
 
 ## Restricted stock data
 
@@ -48,7 +53,7 @@ SOH snapshot rows and count flags receive no Stock Taker RLS policy, so direct q
 
 ## Policy review checklist
 
-- RLS enabled and forced on every exposed Phase 1–4 table.
+- RLS enabled and forced on every exposed Phase 1–5 table.
 - Explicit `TO authenticated`; no `auth.role()` checks.
 - SELECT is separately granted because RLS does not provide table privileges.
 - No policy contains an unconditional `true` predicate.

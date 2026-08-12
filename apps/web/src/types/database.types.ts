@@ -178,18 +178,24 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          recognition_high_confidence: number
+          recognition_medium_confidence: number
           reopen_window_days: number
           updated_at: string
         }
         Insert: {
           company_id: string
           created_at?: string
+          recognition_high_confidence?: number
+          recognition_medium_confidence?: number
           reopen_window_days?: number
           updated_at?: string
         }
         Update: {
           company_id?: string
           created_at?: string
+          recognition_high_confidence?: number
+          recognition_medium_confidence?: number
           reopen_window_days?: number
           updated_at?: string
         }
@@ -637,6 +643,142 @@ export type Database = {
         }
         Relationships: []
       }
+      recognition_events: {
+        Row: {
+          candidate_products: Json
+          captured_at: string
+          cleaned_at: string | null
+          cleanup_attempts: number
+          cleanup_error: string | null
+          company_id: string
+          confidence: number | null
+          confidence_tier: Database["public"]["Enums"]["recognition_confidence_tier"]
+          created_at: string
+          id: string
+          idempotency_key: string
+          last_cleanup_attempt_at: string | null
+          media_bucket: string | null
+          media_expires_at: string | null
+          media_path: string | null
+          media_status: Database["public"]["Enums"]["recognition_media_status"]
+          model: string
+          next_cleanup_at: string | null
+          provider: string
+          recognized_at: string
+          selected_at: string | null
+          selected_product_id: string | null
+          selection_method: Database["public"]["Enums"]["recognition_selection_method"]
+          stock_take_id: string
+          stock_taker_session_id: string
+          user_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          candidate_products?: Json
+          captured_at: string
+          cleaned_at?: string | null
+          cleanup_attempts?: number
+          cleanup_error?: string | null
+          company_id: string
+          confidence?: number | null
+          confidence_tier: Database["public"]["Enums"]["recognition_confidence_tier"]
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          last_cleanup_attempt_at?: string | null
+          media_bucket?: string | null
+          media_expires_at?: string | null
+          media_path?: string | null
+          media_status?: Database["public"]["Enums"]["recognition_media_status"]
+          model: string
+          next_cleanup_at?: string | null
+          provider: string
+          recognized_at?: string
+          selected_at?: string | null
+          selected_product_id?: string | null
+          selection_method?: Database["public"]["Enums"]["recognition_selection_method"]
+          stock_take_id: string
+          stock_taker_session_id: string
+          user_id: string
+          warehouse_id: string
+        }
+        Update: {
+          candidate_products?: Json
+          captured_at?: string
+          cleaned_at?: string | null
+          cleanup_attempts?: number
+          cleanup_error?: string | null
+          company_id?: string
+          confidence?: number | null
+          confidence_tier?: Database["public"]["Enums"]["recognition_confidence_tier"]
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          last_cleanup_attempt_at?: string | null
+          media_bucket?: string | null
+          media_expires_at?: string | null
+          media_path?: string | null
+          media_status?: Database["public"]["Enums"]["recognition_media_status"]
+          model?: string
+          next_cleanup_at?: string | null
+          provider?: string
+          recognized_at?: string
+          selected_at?: string | null
+          selected_product_id?: string | null
+          selection_method?: Database["public"]["Enums"]["recognition_selection_method"]
+          stock_take_id?: string
+          stock_taker_session_id?: string
+          user_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recognition_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recognition_events_company_user_fkey"
+            columns: ["company_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "recognition_events_selected_product_fkey"
+            columns: ["selected_product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "recognition_events_session_scope_fkey"
+            columns: [
+              "stock_taker_session_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "stock_taker_sessions"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+          {
+            foreignKeyName: "recognition_events_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
       stock_snapshot_lines: {
         Row: {
           company_id: string
@@ -971,11 +1113,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      authorize_recognition_cleanup: {
+        Args: { p_token: string }
+        Returns: boolean
+      }
+      claim_recognition_media_cleanup: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      complete_recognition_media_cleanup: {
+        Args: {
+          p_error?: string
+          p_recognition_event_id: string
+          p_success: boolean
+        }
+        Returns: Json
+      }
       complete_stock_take: {
         Args: {
           p_company_id: string
           p_stock_take_id: string
           p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      confirm_recognition_selection: {
+        Args: {
+          p_product_id: string
+          p_recognition_event_id: string
+          p_selection_method: Database["public"]["Enums"]["recognition_selection_method"]
         }
         Returns: Json
       }
@@ -1026,6 +1192,7 @@ export type Database = {
         }
         Returns: Json
       }
+      record_recognition_event: { Args: { p_record: Json }; Returns: Json }
       reopen_stock_take: {
         Args: {
           p_company_id: string
@@ -1053,6 +1220,10 @@ export type Database = {
       }
       submit_count: { Args: { p_record: Json }; Returns: Json }
       sync_counts_batch: { Args: { p_records: Json }; Returns: Json }
+      sync_recognition_events_batch: {
+        Args: { p_records: Json }
+        Returns: Json
+      }
     }
     Enums: {
       count_flag_status: "OPEN" | "RESOLVED"
@@ -1067,6 +1238,13 @@ export type Database = {
       import_kind: "product_master" | "stock_snapshot"
       membership_role: "super_admin" | "admin" | "manager" | "stock_taker"
       platform_role: "super_admin"
+      recognition_confidence_tier: "HIGH" | "MEDIUM" | "LOW" | "NO_MATCH"
+      recognition_media_status: "NOT_STORED" | "PENDING" | "DELETED" | "FAILED"
+      recognition_selection_method:
+        | "AUTO_PRESELECT"
+        | "CANDIDATE_CONFIRMATION"
+        | "MANUAL_SEARCH"
+        | "NO_SELECTION"
       record_status: "active" | "inactive"
       stock_take_status:
         | "DRAFT"
@@ -1217,6 +1395,14 @@ export const Constants = {
       import_kind: ["product_master", "stock_snapshot"],
       membership_role: ["super_admin", "admin", "manager", "stock_taker"],
       platform_role: ["super_admin"],
+      recognition_confidence_tier: ["HIGH", "MEDIUM", "LOW", "NO_MATCH"],
+      recognition_media_status: ["NOT_STORED", "PENDING", "DELETED", "FAILED"],
+      recognition_selection_method: [
+        "AUTO_PRESELECT",
+        "CANDIDATE_CONFIRMATION",
+        "MANUAL_SEARCH",
+        "NO_SELECTION",
+      ],
       record_status: ["active", "inactive"],
       stock_take_status: [
         "DRAFT",
