@@ -173,6 +173,7 @@ select is(
   'manager moves ACTIVE stock take to REVIEW'
 );
 select is((select status::text from public.stock_taker_sessions limit 1), 'ENDED', 'entering REVIEW closes active sessions');
+select private.test_set_auth_phase_3_lifecycle('10000000-0000-4000-8000-000000000010');
 select is(
   public.complete_stock_take(
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -180,10 +181,10 @@ select is(
     'a4000000-0000-4000-8000-000000000001'
   ) ->> 'success',
   'true',
-  'manager completes a REVIEW stock take'
+  'admin completes a REVIEW stock take'
 );
 select ok(
-  (select status = 'COMPLETED' and completed_at is not null and completed_by = '10000000-0000-4000-8000-000000000020'
+  (select status = 'COMPLETED' and completed_at is not null and completed_by = '10000000-0000-4000-8000-000000000010'
    from public.stock_takes where id = 'a4000000-0000-4000-8000-000000000001'),
   'completion records state, time, and actor'
 );
