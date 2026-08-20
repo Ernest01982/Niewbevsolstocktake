@@ -342,14 +342,22 @@ h2 {
   margin: 0;
   color: #667064;
 }
-.count-header-actions {
-  display: grid;
-  justify-items: end;
-  gap: 0.55rem;
+.session-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin: -0.35rem 0 1rem;
+}
+.session-actions .secondary-button {
+  min-height: 2.75rem;
 }
 .logout-button {
-  min-height: 2.5rem;
-  padding: 0.45rem 0.8rem;
+  border-color: #c88f8f;
+  color: #8a1d1d;
+}
+.logout-button:hover {
+  border-color: #a32222;
+  background: #fff0f0;
 }
 .connectivity {
   display: inline-flex;
@@ -818,6 +826,13 @@ th {
   }
   .assignment-bar {
     grid-template-columns: minmax(12rem, 1fr) auto;
+  }
+}
+
+@media (max-width: 30rem) {
+  .session-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
