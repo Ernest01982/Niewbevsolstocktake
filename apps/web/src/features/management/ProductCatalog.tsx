@@ -6,6 +6,7 @@ import {
   validateColumnMapping,
 } from '../imports/mapping';
 import { csvText, parseCsv, type ParsedCsv } from '../imports/csv';
+import { excelTemplate, parseExcel } from '../imports/excel';
 
 type Product = Database['public']['Tables']['products']['Row'];
 type Brand = Database['public']['Tables']['brands']['Row'];
@@ -72,10 +73,10 @@ function positiveInteger(value: string): number | null {
   return value === '' ? null : Number(value);
 }
 
-async function sha256(source: string): Promise<string> {
+async function sha256(source: string | ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-256',
-    new TextEncoder().encode(source),
+    typeof source === 'string' ? new TextEncoder().encode(source) : source,
   );
   return Array.from(new Uint8Array(digest), (byte) =>
     byte.toString(16).padStart(2, '0'),
@@ -93,7 +94,7 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
   const [showArchived, setShowArchived] = useState(false);
   const [parsed, setParsed] = useState<ParsedCsv>();
   const [sourceFile, setSourceFile] = useState<File>();
-  const [sourceText, setSourceText] = useState('');
+  const [sourceData, setSourceData] = useState<string | ArrayBuffer>('');
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [importSummary, setImportSummary] =
     useState<ImportResponse['totals']>();
@@ -231,18 +232,21 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
     setParsed(undefined);
     setSourceFile(file);
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setError(
-        'Please save the spreadsheet as a CSV file before uploading it.',
-      );
+    const extension = file.name.toLowerCase().split('.').pop();
+    if (!['csv', 'xlsx'].includes(extension ?? '')) {
+      setError('Please choose an Excel (.xlsx) or CSV (.csv) file.');
       return;
     }
     try {
-      const text = await file.text();
-      const nextParsed = parseCsv(text);
+      const data =
+        extension === 'xlsx' ? await file.arrayBuffer() : await file.text();
+      const nextParsed =
+        typeof data === 'string' ? parseCsv(data) : await parseExcel(data);
       if (nextParsed.rows.length === 0)
-        throw new Error('The CSV file has headings but no stock-item rows.');
-      setSourceText(text);
+        throw new Error(
+          'The file has headings but does not contain any stock-item rows.',
+        );
+      setSourceData(data);
       setParsed(nextParsed);
       setMapping(
         Object.fromEntries(
@@ -258,25 +262,47 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
       setError(
         caught instanceof Error
           ? caught.message
-          : 'The CSV file could not be read.',
+          : 'The stock master file could not be read.',
       );
     }
   }
 
-  function downloadTemplate() {
-    const template = csvText([...productMasterLogicalFields], []);
-    const blobUrl = URL.createObjectURL(
-      new Blob([`\uFEFF${template}`], { type: 'text/csv;charset=utf-8' }),
-    );
+  function triggerDownload(blob: Blob, filename: string) {
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = 'stock-item-upload-template.csv';
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(blobUrl);
+  }
+
+  function downloadCsvTemplate() {
+    const template = csvText([...productMasterLogicalFields], []);
+    triggerDownload(
+      new Blob([`\uFEFF${template}`], { type: 'text/csv;charset=utf-8' }),
+      'stock-master-template.csv',
+    );
     setError('');
     setMessage(
       'CSV template downloaded. Product code and product name are required.',
     );
+  }
+
+  async function downloadExcelTemplate() {
+    setBusy(true);
+    setError('');
+    try {
+      triggerDownload(
+        await excelTemplate([...productMasterLogicalFields]),
+        'stock-master-template.xlsx',
+      );
+      setMessage(
+        'Excel template downloaded. Product code and product name are required.',
+      );
+    } catch {
+      setError('The Excel template could not be created.');
+    }
+    setBusy(false);
   }
 
   async function runImport() {
@@ -284,7 +310,7 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
     const validation = validateColumnMapping('product_master', mapping);
     if (!validation.success) {
       setError(
-        'Map Product code and Product name, and do not reuse the same CSV column.',
+        'Map Product code and Product name, and do not reuse the same file column.',
       );
       return;
     }
@@ -299,7 +325,7 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
         p_rows: parsed.rows as Json,
         p_source_filename: sourceFile.name,
         p_source_metadata: { uploaded_from: 'admin_product_catalog' },
-        p_source_sha256: await sha256(sourceText),
+        p_source_sha256: await sha256(sourceData),
       },
     );
     const result = data as ImportResponse | null;
@@ -451,22 +477,34 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
         </article>
 
         <article className="sub-card">
-          <p className="step-label">CSV spreadsheet</p>
+          <p className="step-label">Excel or CSV spreadsheet</p>
           <h3>Bulk upload</h3>
           <p className="muted-copy">
-            Download the correctly aligned template, populate it, then upload
-            the completed CSV. Product code and product name are required.
+            Download either correctly aligned template, populate it, then upload
+            the completed Excel or CSV file. Product code and product name are
+            required.
           </p>
-          <button
-            className="secondary-button template-button"
-            onClick={downloadTemplate}
-            type="button"
-          >
-            Download CSV template
-          </button>
+          <div className="template-button-row">
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void downloadExcelTemplate()}
+              type="button"
+            >
+              Download Excel template
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={downloadCsvTemplate}
+              type="button"
+            >
+              Download CSV template
+            </button>
+          </div>
           <input
-            aria-label="Choose stock item CSV"
-            accept=".csv,text/csv"
+            aria-label="Choose stock master Excel or CSV file"
+            accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
             type="file"
             onChange={(event) => void selectFile(event.target.files?.[0])}
           />
