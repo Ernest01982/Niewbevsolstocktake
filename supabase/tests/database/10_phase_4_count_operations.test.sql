@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(31);
 
 create function private.test_set_auth_phase_4_count(test_user_id uuid)
 returns void language plpgsql security invoker set search_path = '' as $$
@@ -114,6 +114,10 @@ select is(public.submit_count(jsonb_build_object(
 )) #>> '{error,code}', 'counting_closed', 'a manager cannot submit through another user session');
 
 select is(public.move_stock_take_to_review('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'manager moves stock take to review');
+select is(public.resolve_count_flag(
+  (select id from public.count_flags where stock_take_id = 'a4000000-0000-4000-8000-000000000001' and status = 'OPEN' limit 1),
+  'Duplicate records reviewed before finalisation.'
+) ->> 'success', 'true', 'manager resolves the duplicate flag before finalisation');
 select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'manager completes stock take');
 select private.test_set_auth_phase_4_count('10000000-0000-4000-8000-000000000030');
 select is(public.submit_count(jsonb_build_object(

@@ -178,6 +178,7 @@ export type Database = {
         Row: {
           company_id: string
           created_at: string
+          default_variance_threshold_units: number
           recognition_high_confidence: number
           recognition_medium_confidence: number
           reopen_window_days: number
@@ -186,6 +187,7 @@ export type Database = {
         Insert: {
           company_id: string
           created_at?: string
+          default_variance_threshold_units?: number
           recognition_high_confidence?: number
           recognition_medium_confidence?: number
           reopen_window_days?: number
@@ -194,6 +196,7 @@ export type Database = {
         Update: {
           company_id?: string
           created_at?: string
+          default_variance_threshold_units?: number
           recognition_high_confidence?: number
           recognition_medium_confidence?: number
           reopen_window_days?: number
@@ -547,6 +550,71 @@ export type Database = {
           },
         ]
       }
+      product_warehouse_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          product_id: string
+          updated_at: string
+          updated_by: string | null
+          variance_threshold_active: boolean
+          variance_threshold_units: number
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          updated_at?: string
+          updated_by?: string | null
+          variance_threshold_active?: boolean
+          variance_threshold_units?: number
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          variance_threshold_active?: boolean
+          variance_threshold_units?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_warehouse_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_warehouse_settings_company_updater_fkey"
+            columns: ["company_id", "updated_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "product_warehouse_settings_product_scope_fkey"
+            columns: ["product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "product_warehouse_settings_warehouse_scope_fkey"
+            columns: ["warehouse_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
       products: {
         Row: {
           barcode: string | null
@@ -776,6 +844,306 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "stock_takes"
             referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
+      recount_batches: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          id: string
+          minimum_absolute_variance_units: number | null
+          status: Database["public"]["Enums"]["recount_batch_status"]
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          minimum_absolute_variance_units?: number | null
+          status?: Database["public"]["Enums"]["recount_batch_status"]
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          minimum_absolute_variance_units?: number | null
+          status?: Database["public"]["Enums"]["recount_batch_status"]
+          stock_take_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recount_batches_company_creator_fkey"
+            columns: ["company_id", "created_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "recount_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recount_batches_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
+      recount_counts: {
+        Row: {
+          cases: number
+          company_id: string
+          duration_ms: number | null
+          id: string
+          idempotency_key: string
+          layers: number
+          pallets: number
+          product_id: string
+          recount_task_id: string
+          stock_take_id: string
+          stock_taker_session_id: string
+          submitted_at: string
+          submitted_by: string
+          total_units: number
+          units: number
+          warehouse_id: string
+        }
+        Insert: {
+          cases: number
+          company_id: string
+          duration_ms?: number | null
+          id?: string
+          idempotency_key: string
+          layers: number
+          pallets: number
+          product_id: string
+          recount_task_id: string
+          stock_take_id: string
+          stock_taker_session_id: string
+          submitted_at?: string
+          submitted_by: string
+          total_units: number
+          units: number
+          warehouse_id: string
+        }
+        Update: {
+          cases?: number
+          company_id?: string
+          duration_ms?: number | null
+          id?: string
+          idempotency_key?: string
+          layers?: number
+          pallets?: number
+          product_id?: string
+          recount_task_id?: string
+          stock_take_id?: string
+          stock_taker_session_id?: string
+          submitted_at?: string
+          submitted_by?: string
+          total_units?: number
+          units?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recount_counts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recount_counts_company_submitter_fkey"
+            columns: ["company_id", "submitted_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "recount_counts_product_scope_fkey"
+            columns: ["product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "recount_counts_session_scope_fkey"
+            columns: [
+              "stock_taker_session_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "stock_taker_sessions"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+          {
+            foreignKeyName: "recount_counts_task_scope_fkey"
+            columns: [
+              "recount_task_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+              "product_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "recount_tasks"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+              "product_id",
+            ]
+          },
+        ]
+      }
+      recount_tasks: {
+        Row: {
+          assigned_user_id: string | null
+          assignment_role: Database["public"]["Enums"]["membership_role"]
+          brand_id: string | null
+          claim_role: Database["public"]["Enums"]["membership_role"]
+          claimed_at: string | null
+          claimed_by: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          effective_threshold_units: number
+          id: string
+          product_id: string
+          recount_batch_id: string
+          source_absolute_variance_units: number
+          source_physical_units: number
+          source_signed_variance_units: number
+          status: Database["public"]["Enums"]["recount_task_status"]
+          stock_take_id: string
+          threshold_source: Database["public"]["Enums"]["variance_threshold_source"]
+          warehouse_id: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          assignment_role?: Database["public"]["Enums"]["membership_role"]
+          brand_id?: string | null
+          claim_role?: Database["public"]["Enums"]["membership_role"]
+          claimed_at?: string | null
+          claimed_by?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          effective_threshold_units: number
+          id?: string
+          product_id: string
+          recount_batch_id: string
+          source_absolute_variance_units: number
+          source_physical_units: number
+          source_signed_variance_units: number
+          status?: Database["public"]["Enums"]["recount_task_status"]
+          stock_take_id: string
+          threshold_source: Database["public"]["Enums"]["variance_threshold_source"]
+          warehouse_id: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          assignment_role?: Database["public"]["Enums"]["membership_role"]
+          brand_id?: string | null
+          claim_role?: Database["public"]["Enums"]["membership_role"]
+          claimed_at?: string | null
+          claimed_by?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          effective_threshold_units?: number
+          id?: string
+          product_id?: string
+          recount_batch_id?: string
+          source_absolute_variance_units?: number
+          source_physical_units?: number
+          source_signed_variance_units?: number
+          status?: Database["public"]["Enums"]["recount_task_status"]
+          stock_take_id?: string
+          threshold_source?: Database["public"]["Enums"]["variance_threshold_source"]
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recount_tasks_assigned_membership_fkey"
+            columns: [
+              "company_id",
+              "warehouse_id",
+              "assigned_user_id",
+              "assignment_role",
+            ]
+            isOneToOne: false
+            referencedRelation: "warehouse_memberships"
+            referencedColumns: ["company_id", "warehouse_id", "user_id", "role"]
+          },
+          {
+            foreignKeyName: "recount_tasks_batch_scope_fkey"
+            columns: [
+              "recount_batch_id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "recount_batches"
+            referencedColumns: [
+              "id",
+              "company_id",
+              "warehouse_id",
+              "stock_take_id",
+            ]
+          },
+          {
+            foreignKeyName: "recount_tasks_brand_scope_fkey"
+            columns: ["brand_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "brands"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "recount_tasks_claimed_membership_fkey"
+            columns: ["company_id", "warehouse_id", "claimed_by", "claim_role"]
+            isOneToOne: false
+            referencedRelation: "warehouse_memberships"
+            referencedColumns: ["company_id", "warehouse_id", "user_id", "role"]
+          },
+          {
+            foreignKeyName: "recount_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recount_tasks_product_scope_fkey"
+            columns: ["product_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id", "company_id"]
           },
         ]
       }
@@ -1070,6 +1438,51 @@ export type Database = {
           },
         ]
       }
+      warehouse_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          updated_at: string
+          updated_by: string | null
+          variance_threshold_active: boolean
+          variance_threshold_units: number
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          variance_threshold_active?: boolean
+          variance_threshold_units?: number
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          variance_threshold_active?: boolean
+          variance_threshold_units?: number
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warehouse_settings_company_updater_fkey"
+            columns: ["company_id", "updated_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "warehouse_settings_warehouse_scope_fkey"
+            columns: ["warehouse_id", "company_id"]
+            isOneToOne: true
+            referencedRelation: "warehouses"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
       warehouses: {
         Row: {
           company_id: string
@@ -1113,6 +1526,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assign_recount_tasks: {
+        Args: {
+          p_assigned_user_id?: string
+          p_company_id: string
+          p_recount_task_ids: string[]
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       authorize_recognition_cleanup: {
         Args: { p_token: string }
         Returns: boolean
@@ -1121,6 +1543,7 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      claim_recount_task: { Args: { p_recount_task_id: string }; Returns: Json }
       complete_recognition_media_cleanup: {
         Args: {
           p_error?: string
@@ -1145,12 +1568,44 @@ export type Database = {
         }
         Returns: Json
       }
+      create_recount_batch: {
+        Args: {
+          p_assigned_user_id?: string
+          p_brand_id?: string
+          p_company_id: string
+          p_minimum_absolute_variance_units?: number
+          p_product_id?: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       create_stock_take: {
         Args: { p_company_id: string; p_warehouse_id: string }
         Returns: Json
       }
       end_stock_taker_session: { Args: { p_session_id: string }; Returns: Json }
+      get_manager_progress: {
+        Args: {
+          p_company_id: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
+      get_recount_work: { Args: never; Returns: Json }
       get_stock_taker_context: { Args: never; Returns: Json }
+      get_variances: {
+        Args: {
+          p_brand_id?: string
+          p_company_id: string
+          p_minimum_absolute_variance_units?: number
+          p_product_id?: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       import_product_master: {
         Args: {
           p_column_mapping: Json
@@ -1202,6 +1657,24 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_count_flag: {
+        Args: { p_count_flag_id: string; p_resolution_note: string }
+        Returns: Json
+      }
+      set_company_variance_threshold: {
+        Args: { p_company_id: string; p_threshold_units: number }
+        Returns: Json
+      }
+      set_variance_threshold: {
+        Args: {
+          p_active?: boolean
+          p_company_id: string
+          p_product_id?: string
+          p_threshold_units: number
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       start_stock_take: {
         Args: {
           p_company_id: string
@@ -1219,6 +1692,7 @@ export type Database = {
         Returns: Json
       }
       submit_count: { Args: { p_record: Json }; Returns: Json }
+      submit_recount: { Args: { p_record: Json }; Returns: Json }
       sync_counts_batch: { Args: { p_records: Json }; Returns: Json }
       sync_recognition_events_batch: {
         Args: { p_records: Json }
@@ -1246,6 +1720,8 @@ export type Database = {
         | "MANUAL_SEARCH"
         | "NO_SELECTION"
       record_status: "active" | "inactive"
+      recount_batch_status: "OPEN" | "COMPLETED"
+      recount_task_status: "UNASSIGNED" | "ASSIGNED" | "CLAIMED" | "COMPLETED"
       stock_take_status:
         | "DRAFT"
         | "READY"
@@ -1255,6 +1731,7 @@ export type Database = {
         | "COMPLETED"
         | "REOPENED"
       stock_taker_session_status: "ACTIVE" | "ENDED"
+      variance_threshold_source: "COMPANY" | "WAREHOUSE" | "PRODUCT"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1404,6 +1881,8 @@ export const Constants = {
         "NO_SELECTION",
       ],
       record_status: ["active", "inactive"],
+      recount_batch_status: ["OPEN", "COMPLETED"],
+      recount_task_status: ["UNASSIGNED", "ASSIGNED", "CLAIMED", "COMPLETED"],
       stock_take_status: [
         "DRAFT",
         "READY",
@@ -1414,6 +1893,7 @@ export const Constants = {
         "REOPENED",
       ],
       stock_taker_session_status: ["ACTIVE", "ENDED"],
+      variance_threshold_source: ["COMPANY", "WAREHOUSE", "PRODUCT"],
     },
   },
 } as const

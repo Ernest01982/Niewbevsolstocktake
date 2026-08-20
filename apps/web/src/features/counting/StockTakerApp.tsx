@@ -28,6 +28,10 @@ import {
   syncPendingRecognitions,
   type RecognitionResult,
 } from '../recognition/recognition';
+import {
+  ManagerApp,
+  type ManagementMembership,
+} from '../management/ManagerApp';
 
 type Connectivity = 'Offline' | 'Online' | 'Syncing';
 
@@ -57,6 +61,28 @@ interface StockTakerContext {
   available_contexts: AvailableContext[];
   session: ActiveSession | null;
   success: boolean;
+}
+
+interface RecountProduct {
+  barcode: string | null;
+  cases_per_layer: number | null;
+  cases_per_pallet: number | null;
+  id: string;
+  name: string;
+  product_code: string;
+  units_per_case: number | null;
+}
+
+interface RecountTask {
+  claimable: boolean;
+  product: RecountProduct;
+  status: 'UNASSIGNED' | 'ASSIGNED' | 'CLAIMED';
+  task_id: string;
+}
+
+interface RecountWorkResponse {
+  success: boolean;
+  tasks: RecountTask[];
 }
 
 const emptyInputs = { cases: '', layers: '', pallets: '', units: '' };
@@ -213,6 +239,276 @@ function ConnectivityBadge({
       <span>{state}</span>
       {pending > 0 && <span>· {pending} pending</span>}
     </div>
+  );
+}
+
+function RecountScreen({ active }: { active: ActiveSession }) {
+  const [tasks, setTasks] = useState<RecountTask[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [inputs, setInputs] = useState(emptyInputs);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const idempotencyKeys = useRef(new Map<string, string>());
+
+  const selectedTask = tasks.find((task) => task.task_id === selectedTaskId);
+
+  const loadWork = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const { data, error: workError } = await supabase.rpc('get_recount_work');
+    if (workError) {
+      setError(workError.message);
+      setLoading(false);
+      return;
+    }
+    const work = data as unknown as RecountWorkResponse;
+    if (!work.success) {
+      setError('Blind recount work could not be loaded.');
+      setLoading(false);
+      return;
+    }
+    setTasks(work.tasks);
+    setSelectedTaskId((current) =>
+      work.tasks.some((task) => task.task_id === current)
+        ? current
+        : (work.tasks[0]?.task_id ?? ''),
+    );
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => void loadWork());
+  }, [loadWork]);
+
+  const totalPreview = useMemo(() => {
+    if (!selectedTask) return undefined;
+    try {
+      const quantities = Object.fromEntries(
+        Object.entries(inputs).map(([key, value]) => [
+          key,
+          parseQuantityInput(value),
+        ]),
+      ) as unknown as CountQuantities;
+      return calculateTotalUnits(selectedTask.product, quantities);
+    } catch {
+      return undefined;
+    }
+  }, [inputs, selectedTask]);
+
+  async function claimTask() {
+    if (!selectedTask) return;
+    setSubmitting(true);
+    setError('');
+    const { data, error: claimError } = await supabase.rpc(
+      'claim_recount_task',
+      { p_recount_task_id: selectedTask.task_id },
+    );
+    const result = data as {
+      error?: { message?: string };
+      success?: boolean;
+    } | null;
+    if (claimError) setError(claimError.message);
+    else if (!result?.success)
+      setError(result?.error?.message ?? 'This task is no longer available.');
+    else {
+      setMessage('Recount task claimed. Complete the blind physical count.');
+      await loadWork();
+    }
+    setSubmitting(false);
+  }
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!selectedTask || selectedTask.status !== 'CLAIMED') return;
+    if (!navigator.onLine) {
+      setError('Recount submission needs a connection. Keep this screen open.');
+      return;
+    }
+    if (!Object.values(inputs).some((value) => value.trim() !== '')) {
+      setError(
+        'Enter at least one quantity, including an explicit 0 for zero stock.',
+      );
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const quantities = Object.fromEntries(
+        Object.entries(inputs).map(([key, value]) => [
+          key,
+          parseQuantityInput(value),
+        ]),
+      ) as unknown as CountQuantities;
+      calculateTotalUnits(selectedTask.product, quantities);
+      let idempotencyKey = idempotencyKeys.current.get(selectedTask.task_id);
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID();
+        idempotencyKeys.current.set(selectedTask.task_id, idempotencyKey);
+      }
+      const { data, error: submitError } = await supabase.rpc(
+        'submit_recount',
+        {
+          p_record: {
+            ...quantities,
+            idempotency_key: idempotencyKey,
+            recount_task_id: selectedTask.task_id,
+            stock_taker_session_id: active.id,
+          },
+        },
+      );
+      const result = data as {
+        acknowledged?: boolean;
+        error?: { message?: string };
+        success?: boolean;
+        total_units?: number;
+      } | null;
+      if (submitError) throw submitError;
+      if (!result?.success || !result.acknowledged)
+        throw new Error(
+          result?.error?.message ?? 'The recount was not acknowledged.',
+        );
+      setMessage(
+        `${selectedTask.product.name}: ${result.total_units?.toLocaleString() ?? '0'} units submitted.`,
+      );
+      idempotencyKeys.current.delete(selectedTask.task_id);
+      setInputs(emptyInputs);
+      setSelectedTaskId('');
+      await loadWork();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : 'The recount could not be submitted.',
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="count-shell recount-shell">
+      <header className="count-header">
+        <div>
+          <p className="eyebrow">{active.warehouse.code} · Blind work</p>
+          <h1>Recount stock</h1>
+          <p>{active.warehouse.name}</p>
+        </div>
+        <ConnectivityBadge
+          pending={0}
+          state={navigator.onLine ? 'Online' : 'Offline'}
+        />
+      </header>
+      <div className="blind-banner">
+        Count what is physically present. Prior counts, system stock and
+        variance are intentionally hidden.
+      </div>
+      {message && <div className="success-banner">{message}</div>}
+      {error && <div className="error-banner">{error}</div>}
+      <section className="count-card">
+        <div className="section-heading">
+          <div>
+            <p className="step-label">Assigned or available</p>
+            <h2>Recount queue</h2>
+          </div>
+          <button className="text-button" onClick={() => void loadWork()}>
+            Refresh
+          </button>
+        </div>
+        {loading ? (
+          <p>Loading blind work…</p>
+        ) : tasks.length === 0 ? (
+          <div className="empty-state">
+            No recount work is assigned or available right now.
+          </div>
+        ) : (
+          <div className="recount-task-list">
+            {tasks.map((task) => (
+              <button
+                className={task.task_id === selectedTaskId ? 'selected' : ''}
+                key={task.task_id}
+                onClick={() => {
+                  setSelectedTaskId(task.task_id);
+                  setInputs(emptyInputs);
+                  setError('');
+                }}
+                type="button"
+              >
+                <span>
+                  <strong>{task.product.name}</strong>
+                  <small>
+                    {task.product.product_code}
+                    {task.product.barcode ? ` · ${task.product.barcode}` : ''}
+                  </small>
+                </span>
+                <span className="status-chip">{task.status}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {selectedTask && (
+        <form className="count-card recount-form" onSubmit={submit}>
+          <p className="step-label">Full-product physical recount</p>
+          <h2>{selectedTask.product.name}</h2>
+          <p className="product-code">{selectedTask.product.product_code}</p>
+          {selectedTask.status !== 'CLAIMED' ? (
+            <button
+              className="primary-button submit-count"
+              disabled={submitting || !navigator.onLine}
+              onClick={() => void claimTask()}
+              type="button"
+            >
+              {submitting ? 'Claiming…' : 'Claim task & start recount'}
+            </button>
+          ) : (
+            <>
+              <div className="quantity-grid">
+                {(['pallets', 'layers', 'cases', 'units'] as const).map(
+                  (field) => (
+                    <label key={field}>
+                      <span>{field[0]!.toUpperCase() + field.slice(1)}</span>
+                      <input
+                        aria-label={`recount ${field}`}
+                        inputMode="numeric"
+                        min="0"
+                        onChange={(event) =>
+                          setInputs((current) => ({
+                            ...current,
+                            [field]: event.target.value,
+                          }))
+                        }
+                        pattern="[0-9]*"
+                        placeholder="0"
+                        type="number"
+                        value={inputs[field]}
+                      />
+                    </label>
+                  ),
+                )}
+              </div>
+              <div className="total-panel">
+                <span>Total units</span>
+                <strong>
+                  {totalPreview === undefined
+                    ? '—'
+                    : totalPreview.toLocaleString()}
+                </strong>
+              </div>
+              <button
+                className="primary-button submit-count"
+                disabled={submitting || !navigator.onLine}
+                type="submit"
+              >
+                {submitting ? 'Submitting…' : 'Submit immutable recount'}
+              </button>
+            </>
+          )}
+        </form>
+      )}
+    </main>
   );
 }
 
@@ -625,6 +921,9 @@ function CountingScreen({ active }: { active: ActiveSession }) {
 export function StockTakerApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [context, setContext] = useState<StockTakerContext>();
+  const [managementMembership, setManagementMembership] = useState<
+    ManagementMembership | null | undefined
+  >(undefined);
   const [error, setError] = useState('');
 
   const loadContext = useCallback(async () => {
@@ -645,12 +944,35 @@ export function StockTakerApp() {
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setContext(undefined);
+      setManagementMembership(undefined);
     });
     return () => data.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (session) queueMicrotask(() => void loadContext());
+    if (!session) return;
+    queueMicrotask(() => {
+      void supabase
+        .from('company_memberships')
+        .select('company_id,role')
+        .eq('user_id', session.user.id)
+        .eq('status', 'active')
+        .in('role', ['super_admin', 'admin', 'manager'])
+        .limit(1)
+        .maybeSingle()
+        .then(({ data, error: membershipError }) => {
+          if (membershipError) {
+            setError(membershipError.message);
+            return;
+          }
+          if (data) {
+            setManagementMembership(data as ManagementMembership);
+            return;
+          }
+          setManagementMembership(null);
+          void loadContext();
+        });
+    });
   }, [loadContext, session]);
 
   if (session === undefined)
@@ -658,6 +980,10 @@ export function StockTakerApp() {
   if (!session) return <SignIn />;
   if (error)
     return <main className="loading-shell error-message">{error}</main>;
+  if (managementMembership === undefined)
+    return <main className="loading-shell">Loading secure role…</main>;
+  if (managementMembership)
+    return <ManagerApp membership={managementMembership} />;
   if (!context)
     return <main className="loading-shell">Loading warehouse context…</main>;
   if (!context.session)
@@ -667,5 +993,9 @@ export function StockTakerApp() {
         onStarted={loadContext}
       />
     );
-  return <CountingScreen active={context.session} />;
+  return context.session.stock_take.status === 'RECOUNT' ? (
+    <RecountScreen active={context.session} />
+  ) : (
+    <CountingScreen active={context.session} />
+  );
 }

@@ -1,6 +1,6 @@
 # AI Stock Take Control System
 
-Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, offline counting, and AI-recognition foundations through Phase 5 of the frozen build specification.
+Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, offline counting, AI-recognition, and controlled variance/recount foundations through Phase 6 of the frozen build specification.
 
 ## Current scope
 
@@ -10,7 +10,8 @@ Version 1 is an offline-first, multi-company stock-taking SaaS. This repository 
 - Phase 3: database-enforced lifecycle transitions, READY validation, one active stock-taker session per user, safe session context, completion locking, and privileged recount-only reopen.
 - Phase 4: immutable Bulk/Pick Face counts, canonical packaging calculation, IndexedDB product cache and durable queue, idempotent per-record sync, duplicate warnings/flags, and the mobile stock-taker counting flow.
 - Phase 5: live camera capture, provider abstraction, database-owned confidence tiers, candidate confirmation, durable offline manual-selection logs, private transient recognition media, and Vault-authenticated cleanup.
-- Variance, recount, and reporting workflows are not implemented yet.
+- Phase 6: management progress and derived variances, layered company/warehouse/product thresholds, audited duplicate resolution, generated/assigned blind recount tasks, atomic claims, immutable recount submission, guarded finalisation, and role-aware Manager/Stock Taker screens.
+- Historical reporting and executive insight workflows remain later-phase work.
 
 ## Prerequisites
 
@@ -45,4 +46,4 @@ supabase/tests/database/   pgTAP schema, RLS, and immutability tests
 supabase/seed.sql          Deterministic local-only fixtures
 ```
 
-See the phase plans in `docs/architecture/`, including `phase-5-plan.md`, before extending the schema.
+See the phase plans in `docs/architecture/`, including `phase-6-plan.md`, before extending the schema.
