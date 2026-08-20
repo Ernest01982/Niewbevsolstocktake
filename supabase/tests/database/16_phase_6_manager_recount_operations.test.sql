@@ -153,7 +153,7 @@ insert into public.recount_tasks (
   'a2000000-0000-4000-8000-000000000001',725,5,5,3,'PRODUCT'
 );
 set local role authenticated;
-select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000020');
+select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000010');
 select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') #>> '{error,code}', 'recounts_outstanding', 'open recount blocks finalisation');
 
 reset role;
@@ -161,7 +161,7 @@ update public.recount_tasks set status = 'COMPLETED', claimed_by = '10000000-000
 where id = 'bae00000-0000-4000-8000-000000000002';
 update public.recount_batches set status = 'COMPLETED', completed_at = now() where id = 'bad00000-0000-4000-8000-000000000002';
 set local role authenticated;
-select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000020');
+select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000010');
 select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') #>> '{error,code}', 'count_flags_outstanding', 'open duplicate flag blocks finalisation');
 select is(public.resolve_count_flag('bab00000-0000-4000-8000-000000000001','   ') #>> '{error,code}', 'resolution_note_required', 'flag resolution requires a management note');
 select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000030');
@@ -169,7 +169,8 @@ select is(public.resolve_count_flag('bab00000-0000-4000-8000-000000000001','Revi
 select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000020');
 select is(public.resolve_count_flag('bab00000-0000-4000-8000-000000000001','Reviewed duplicate records before finalisation.') ->> 'success', 'true', 'manager resolves count flag through controlled RPC');
 select is(public.resolve_count_flag('bab00000-0000-4000-8000-000000000001','Reviewed duplicate records before finalisation.') ->> 'existing', 'true', 'flag resolution retry is idempotent');
-select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'manager completes after all guards are clear');
+select private.test_set_auth_phase_6_ops('10000000-0000-4000-8000-000000000010');
+select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'admin completes after all guards are clear');
 reset role;
 select is((select count(*)::integer from public.audit_logs where action = 'count_flag.resolved' and entity_id = 'bab00000-0000-4000-8000-000000000001'), 1, 'controlled flag resolution is audited once');
 

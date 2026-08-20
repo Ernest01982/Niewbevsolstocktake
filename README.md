@@ -1,6 +1,6 @@
 # AI Stock Take Control System
 
-Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, offline counting, AI-recognition, and controlled variance/recount foundations through Phase 6 of the frozen build specification.
+Version 1 is an offline-first, multi-company stock-taking SaaS. This repository currently contains the engineering, tenancy/security, product/import, lifecycle, offline counting, AI-recognition, controlled variance/recount, Admin catalogue, final approval, and export foundations through Phase 7 of the frozen build specification.
 
 ## Current scope
 
@@ -11,7 +11,8 @@ Version 1 is an offline-first, multi-company stock-taking SaaS. This repository 
 - Phase 4: immutable Bulk/Pick Face counts, canonical packaging calculation, IndexedDB product cache and durable queue, idempotent per-record sync, duplicate warnings/flags, and the mobile stock-taker counting flow.
 - Phase 5: live camera capture, provider abstraction, database-owned confidence tiers, candidate confirmation, durable offline manual-selection logs, private transient recognition media, and Vault-authenticated cleanup.
 - Phase 6: management progress and derived variances, layered company/warehouse/product thresholds, audited duplicate resolution, generated/assigned blind recount tasks, atomic claims, immutable recount submission, guarded finalisation, and role-aware Manager/Stock Taker screens.
-- Historical reporting and executive insight workflows remain later-phase work.
+- Phase 7: Admin/Super Admin product maintenance, mapped CSV bulk uploads, Admin-only final approval and accepted-variance override, locked completed stock-take history, generic SAGE count CSV, reconciliation CSV, and immutable export history.
+- Exact customer-specific SAGE templates, historical reporting, and executive insight workflows remain later-phase work.
 
 ## Prerequisites
 

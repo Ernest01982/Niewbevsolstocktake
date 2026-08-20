@@ -1228,6 +1228,70 @@ export type Database = {
           },
         ]
       }
+      stock_take_exports: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string
+          export_format: string
+          export_kind: string
+          filename: string
+          id: string
+          metadata: Json
+          row_count: number
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by: string
+          export_format?: string
+          export_kind: string
+          filename: string
+          id?: string
+          metadata?: Json
+          row_count: number
+          stock_take_id: string
+          warehouse_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string
+          export_format?: string
+          export_kind?: string
+          filename?: string
+          id?: string
+          metadata?: Json
+          row_count?: number
+          stock_take_id?: string
+          warehouse_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_take_exports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_take_exports_creator_fkey"
+            columns: ["company_id", "created_by"]
+            isOneToOne: false
+            referencedRelation: "company_memberships"
+            referencedColumns: ["company_id", "user_id"]
+          },
+          {
+            foreignKeyName: "stock_take_exports_stock_take_scope_fkey"
+            columns: ["stock_take_id", "company_id", "warehouse_id"]
+            isOneToOne: false
+            referencedRelation: "stock_takes"
+            referencedColumns: ["id", "company_id", "warehouse_id"]
+          },
+        ]
+      }
       stock_taker_sessions: {
         Row: {
           company_id: string
@@ -1305,6 +1369,8 @@ export type Database = {
           company_id: string
           completed_at: string | null
           completed_by: string | null
+          completion_mode: string | null
+          completion_reason: string | null
           created_at: string
           created_by: string
           id: string
@@ -1322,6 +1388,8 @@ export type Database = {
           company_id: string
           completed_at?: string | null
           completed_by?: string | null
+          completion_mode?: string | null
+          completion_reason?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -1339,6 +1407,8 @@ export type Database = {
           company_id?: string
           completed_at?: string | null
           completed_by?: string | null
+          completion_mode?: string | null
+          completion_reason?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -1584,7 +1654,25 @@ export type Database = {
         Args: { p_company_id: string; p_warehouse_id: string }
         Returns: Json
       }
+      create_stock_take_export: {
+        Args: {
+          p_company_id: string
+          p_export_kind?: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       end_stock_taker_session: { Args: { p_session_id: string }; Returns: Json }
+      force_complete_stock_take: {
+        Args: {
+          p_company_id: string
+          p_reason: string
+          p_stock_take_id: string
+          p_warehouse_id: string
+        }
+        Returns: Json
+      }
       get_manager_progress: {
         Args: {
           p_company_id: string
@@ -1659,6 +1747,21 @@ export type Database = {
       }
       resolve_count_flag: {
         Args: { p_count_flag_id: string; p_resolution_note: string }
+        Returns: Json
+      }
+      save_product: {
+        Args: {
+          p_barcode?: string
+          p_brand_name?: string
+          p_cases_per_layer?: number
+          p_cases_per_pallet?: number
+          p_company_id: string
+          p_name?: string
+          p_product_code?: string
+          p_product_id?: string
+          p_status?: Database["public"]["Enums"]["record_status"]
+          p_units_per_case?: number
+        }
         Returns: Json
       }
       set_company_variance_threshold: {

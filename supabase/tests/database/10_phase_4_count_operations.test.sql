@@ -118,7 +118,8 @@ select is(public.resolve_count_flag(
   (select id from public.count_flags where stock_take_id = 'a4000000-0000-4000-8000-000000000001' and status = 'OPEN' limit 1),
   'Duplicate records reviewed before finalisation.'
 ) ->> 'success', 'true', 'manager resolves the duplicate flag before finalisation');
-select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'manager completes stock take');
+select private.test_set_auth_phase_4_count('10000000-0000-4000-8000-000000000010');
+select is(public.complete_stock_take('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','a1000000-0000-4000-8000-000000000001','a4000000-0000-4000-8000-000000000001') ->> 'success', 'true', 'admin completes stock take');
 select private.test_set_auth_phase_4_count('10000000-0000-4000-8000-000000000030');
 select is(public.submit_count(jsonb_build_object(
   'company_id','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','warehouse_id','a1000000-0000-4000-8000-000000000001','stock_take_id','a4000000-0000-4000-8000-000000000001','stock_taker_session_id','a8000000-0000-4000-8000-000000000001','product_id','a3000000-0000-4000-8000-000000000001','count_type','BULK','pallets',0,'layers',0,'cases',0,'units',1,'idempotency_key','c1000000-0000-4000-8000-000000000010'

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../types/database.types';
+import { csvText } from '../imports/csv';
+import { ProductCatalog } from './ProductCatalog';
 
 type MembershipRole = Database['public']['Enums']['membership_role'];
 type StockTakeStatus = Database['public']['Enums']['stock_take_status'];
@@ -18,9 +20,31 @@ interface Warehouse {
 }
 
 interface StockTake {
+  completed_at: string | null;
+  completion_mode: string | null;
+  completion_reason: string | null;
+  created_at: string;
   id: string;
   status: StockTakeStatus;
   warehouse_id: string;
+}
+
+type StockTakeExport =
+  Database['public']['Tables']['stock_take_exports']['Row'];
+
+interface ExportRow {
+  counted_quantity: number;
+  product_code: string;
+  product_name: string;
+  system_quantity: number;
+  variance_quantity: number;
+  warehouse_code: string;
+}
+
+interface ExportResponse extends RpcResult {
+  export_kind?: 'sage_physical_count' | 'reconciliation';
+  filename?: string;
+  rows?: ExportRow[];
 }
 
 interface ManagerProgress {
@@ -78,13 +102,6 @@ interface RpcResult {
   success?: boolean;
 }
 
-const activeStatuses: StockTakeStatus[] = [
-  'ACTIVE',
-  'RECOUNT',
-  'REVIEW',
-  'REOPENED',
-];
-
 function asMessage(result: RpcResult, fallback: string): string {
   return result.error?.message ?? fallback;
 }
@@ -120,6 +137,9 @@ export function ManagerApp({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideConfirmed, setOverrideConfirmed] = useState(false);
+  const [exportHistory, setExportHistory] = useState<StockTakeExport[]>([]);
 
   const scopedStockTakeId = stockTakes.some(
     (stockTake) =>
@@ -136,6 +156,7 @@ export function ManagerApp({
   );
   const canChangeThresholds =
     membership.role === 'admin' || membership.role === 'super_admin';
+  const canFinalise = canChangeThresholds;
 
   const loadScope = useCallback(async () => {
     setLoading(true);
@@ -155,9 +176,10 @@ export function ManagerApp({
           .order('name'),
         supabase
           .from('stock_takes')
-          .select('id,status,warehouse_id')
+          .select(
+            'id,status,warehouse_id,created_at,completed_at,completion_mode,completion_reason',
+          )
           .eq('company_id', membership.company_id)
-          .in('status', activeStatuses)
           .order('created_at', { ascending: false }),
       ],
     );
@@ -195,31 +217,44 @@ export function ManagerApp({
       varianceArgs.p_minimum_absolute_variance_units = Number(
         appliedMinimumVariance,
       );
-    const [progressResult, varianceResult, tasksResult, flagsResult] =
-      await Promise.all([
-        supabase.rpc('get_manager_progress', {
-          p_company_id: membership.company_id,
-          p_stock_take_id: scopedStockTakeId,
-          p_warehouse_id: warehouseId,
-        }),
-        supabase.rpc('get_variances', varianceArgs),
-        supabase
-          .from('recount_tasks')
-          .select('*')
-          .eq('stock_take_id', scopedStockTakeId)
-          .order('created_at'),
-        supabase
-          .from('count_flags')
-          .select('id,count_id,created_at')
-          .eq('stock_take_id', scopedStockTakeId)
-          .eq('status', 'OPEN')
-          .order('created_at'),
-      ]);
+    const [
+      progressResult,
+      varianceResult,
+      tasksResult,
+      flagsResult,
+      exportResult,
+    ] = await Promise.all([
+      supabase.rpc('get_manager_progress', {
+        p_company_id: membership.company_id,
+        p_stock_take_id: scopedStockTakeId,
+        p_warehouse_id: warehouseId,
+      }),
+      supabase.rpc('get_variances', varianceArgs),
+      supabase
+        .from('recount_tasks')
+        .select('*')
+        .eq('stock_take_id', scopedStockTakeId)
+        .order('created_at'),
+      supabase
+        .from('count_flags')
+        .select('id,count_id,created_at')
+        .eq('stock_take_id', scopedStockTakeId)
+        .eq('status', 'OPEN')
+        .order('created_at'),
+      canFinalise
+        ? supabase
+            .from('stock_take_exports')
+            .select('*')
+            .eq('stock_take_id', scopedStockTakeId)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
     const requestError =
       progressResult.error ??
       varianceResult.error ??
       tasksResult.error ??
-      flagsResult.error;
+      flagsResult.error ??
+      exportResult.error;
     if (requestError) {
       setError(requestError.message);
       setLoading(false);
@@ -234,10 +269,12 @@ export function ManagerApp({
       setVariances(varianceData.variances);
       setTasks(tasksResult.data ?? []);
       setFlags(flagsResult.data ?? []);
+      setExportHistory(exportResult.data ?? []);
     }
     setLoading(false);
   }, [
     appliedMinimumVariance,
+    canFinalise,
     membership.company_id,
     scopedStockTakeId,
     warehouseId,
@@ -481,6 +518,10 @@ export function ManagerApp({
   async function advanceLifecycle() {
     if (!selectedStockTake) return;
     if (selectedStockTake.status === 'REVIEW') {
+      if (!canFinalise) {
+        setError('An Admin or Super Admin must give final approval.');
+        return;
+      }
       await runAction(
         () =>
           supabase.rpc('complete_stock_take', {
@@ -501,6 +542,97 @@ export function ManagerApp({
         'Stock take moved to review.',
       );
     }
+  }
+
+  async function forceComplete() {
+    if (!overrideReason.trim()) {
+      setError('Record why the outstanding variances are being accepted.');
+      return;
+    }
+    if (!overrideConfirmed) {
+      setError('Confirm that you accept the unresolved recounts and flags.');
+      return;
+    }
+    await runAction(
+      () =>
+        supabase.rpc('force_complete_stock_take', {
+          p_company_id: membership.company_id,
+          p_reason: overrideReason,
+          p_stock_take_id: scopedStockTakeId,
+          p_warehouse_id: warehouseId,
+        }),
+      'Stock take finalised with an Admin variance override.',
+    );
+    setOverrideReason('');
+    setOverrideConfirmed(false);
+  }
+
+  async function downloadExport(
+    exportKind: 'sage_physical_count' | 'reconciliation',
+  ) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    const { data, error: exportError } = await supabase.rpc(
+      'create_stock_take_export',
+      {
+        p_company_id: membership.company_id,
+        p_export_kind: exportKind,
+        p_stock_take_id: scopedStockTakeId,
+        p_warehouse_id: warehouseId,
+      },
+    );
+    const result = data as ExportResponse | null;
+    if (exportError) setError(exportError.message);
+    else if (!result?.success || !result.rows || !result.filename)
+      setError(asMessage(result ?? {}, 'The export could not be created.'));
+    else {
+      const content =
+        exportKind === 'sage_physical_count'
+          ? csvText(
+              ['ItemCode', 'Quantity'],
+              result.rows.map((row) => [
+                row.product_code,
+                row.counted_quantity,
+              ]),
+            )
+          : csvText(
+              [
+                'ItemCode',
+                'Description',
+                'Warehouse',
+                'SystemQuantity',
+                'CountedQuantity',
+                'Variance',
+              ],
+              result.rows.map((row) => [
+                row.product_code,
+                row.product_name,
+                row.warehouse_code,
+                row.system_quantity,
+                row.counted_quantity,
+                row.variance_quantity,
+              ]),
+            );
+      const blobUrl = URL.createObjectURL(
+        new Blob([content], { type: 'text/csv;charset=utf-8' }),
+      );
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download =
+        exportKind === 'reconciliation'
+          ? result.filename.replace('.csv', '-reconciliation.csv')
+          : result.filename;
+      link.click();
+      URL.revokeObjectURL(blobUrl);
+      setMessage(
+        exportKind === 'sage_physical_count'
+          ? 'SAGE count file downloaded.'
+          : 'Reconciliation report downloaded.',
+      );
+      await refreshDashboard();
+    }
+    setBusy(false);
   }
 
   if (loading && warehouses.length === 0)
@@ -578,9 +710,21 @@ export function ManagerApp({
 
       {message && <div className="success-banner">{message}</div>}
       {error && <div className="error-banner">{error}</div>}
+      {canChangeThresholds && (
+        <details className="manager-card admin-tools">
+          <summary>
+            <span>
+              <strong>Stock item administration</strong>
+              <small>Add, edit, archive, or bulk upload products</small>
+            </span>
+            <span className="role-chip">Admin</span>
+          </summary>
+          <ProductCatalog companyId={membership.company_id} />
+        </details>
+      )}
       {!selectedStockTake || !selectedWarehouse ? (
         <section className="manager-card empty-state">
-          No active stock take is available in this management scope.
+          No stock take is available in this management scope.
         </section>
       ) : (
         <>
@@ -950,6 +1094,107 @@ export function ManagerApp({
             </article>
           </section>
 
+          {selectedStockTake.status === 'COMPLETED' && canFinalise && (
+            <section className="manager-card export-card">
+              <div className="section-heading">
+                <div>
+                  <p className="step-label">Completed and locked</p>
+                  <h2>SAGE exports</h2>
+                  <p className="muted-copy">
+                    Download the final physical quantities or a full variance
+                    reconciliation. The SAGE file currently uses ItemCode and
+                    Quantity columns.
+                  </p>
+                </div>
+                <span className="status-chip">
+                  {selectedStockTake.completion_mode === 'override'
+                    ? 'Admin override'
+                    : 'Standard approval'}
+                </span>
+              </div>
+              {selectedStockTake.completion_reason && (
+                <div className="warning-note">
+                  <strong>Accepted variance reason</strong>
+                  <span>{selectedStockTake.completion_reason}</span>
+                </div>
+              )}
+              <div className="inline-button-row">
+                <button
+                  className="primary-button"
+                  disabled={busy}
+                  onClick={() => void downloadExport('sage_physical_count')}
+                >
+                  Download SAGE count CSV
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void downloadExport('reconciliation')}
+                >
+                  Download reconciliation CSV
+                </button>
+              </div>
+              <div className="export-history">
+                <strong>Export history</strong>
+                {exportHistory.length === 0 ? (
+                  <span>No files downloaded yet.</span>
+                ) : (
+                  exportHistory.map((item) => (
+                    <span key={item.id}>
+                      {new Date(item.created_at).toLocaleString()} ·{' '}
+                      {item.export_kind.replaceAll('_', ' ')} · {item.row_count}{' '}
+                      rows
+                    </span>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
+
+          {selectedStockTake.status === 'REVIEW' &&
+            canFinalise &&
+            ((progress?.open_recounts ?? 0) > 0 ||
+              (progress?.open_duplicate_flags ?? 0) > 0) && (
+              <section className="manager-card override-card">
+                <p className="step-label">Admin-only exception</p>
+                <h2>Finalise with accepted variances</h2>
+                <p>
+                  This stock take still has {progress?.open_recounts ?? 0} open
+                  recounts and {progress?.open_duplicate_flags ?? 0} open flags.
+                  The outstanding identifiers and your reason will be kept in
+                  the audit history.
+                </p>
+                <label>
+                  Required approval reason
+                  <textarea
+                    placeholder="Explain why the unresolved differences are accepted."
+                    value={overrideReason}
+                    onChange={(event) => setOverrideReason(event.target.value)}
+                  />
+                </label>
+                <label className="check-label override-confirm">
+                  <input
+                    checked={overrideConfirmed}
+                    onChange={(event) =>
+                      setOverrideConfirmed(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  I accept the unresolved recounts, flags, and resulting
+                  variances as the final stock-take result.
+                </label>
+                <button
+                  className="danger-button"
+                  disabled={
+                    busy || !overrideReason.trim() || !overrideConfirmed
+                  }
+                  onClick={() => void forceComplete()}
+                >
+                  Finalise with Admin override
+                </button>
+              </section>
+            )}
+
           <section className="finalise-bar">
             <div>
               <strong>{selectedWarehouse.name}</strong>
@@ -959,6 +1204,7 @@ export function ManagerApp({
               className="primary-button"
               disabled={
                 busy ||
+                (selectedStockTake.status === 'REVIEW' && !canFinalise) ||
                 !['ACTIVE', 'RECOUNT', 'REVIEW'].includes(
                   selectedStockTake.status,
                 )
@@ -966,8 +1212,12 @@ export function ManagerApp({
               onClick={() => void advanceLifecycle()}
             >
               {selectedStockTake.status === 'REVIEW'
-                ? 'Complete stock take'
-                : 'Move to review'}
+                ? canFinalise
+                  ? 'Final approval'
+                  : 'Awaiting Admin approval'
+                : selectedStockTake.status === 'COMPLETED'
+                  ? 'Completed and locked'
+                  : 'Move to review'}
             </button>
           </section>
         </>
