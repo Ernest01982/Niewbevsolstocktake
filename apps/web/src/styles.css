@@ -85,6 +85,33 @@ textarea:focus {
   border-color: #2d6f3f;
 }
 
+.password-input {
+  position: relative;
+}
+.password-input input {
+  padding-right: 5rem;
+}
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  min-width: 3.75rem;
+  min-height: 2.25rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0.55rem;
+  background: #eef5eb;
+  color: #215a33;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.password-toggle:hover {
+  background: #deebda;
+}
+.password-toggle:focus-visible {
+  outline: 3px solid rgb(45 111 63 / 30%);
+}
+
 .eyebrow,
 .step-label {
   margin: 0;
@@ -314,6 +341,15 @@ h2 {
 .count-header p:last-child {
   margin: 0;
   color: #667064;
+}
+.count-header-actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.55rem;
+}
+.logout-button {
+  min-height: 2.5rem;
+  padding: 0.45rem 0.8rem;
 }
 .connectivity {
   display: inline-flex;
