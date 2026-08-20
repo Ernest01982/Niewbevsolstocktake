@@ -1,3 +1,4 @@
+-- Version aligned with the migration identifier recorded by the production deployment.
 alter table public.stock_takes
   add column completion_mode text,
   add column completion_reason text,
