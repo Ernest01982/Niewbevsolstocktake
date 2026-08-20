@@ -109,6 +109,7 @@ async function refreshProductCache(companyId: string): Promise<void> {
 function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -142,13 +143,24 @@ function SignIn() {
         </label>
         <label>
           Password
-          <input
-            autoComplete="current-password"
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            type="password"
-            value={password}
-          />
+          <span className="password-input">
+            <input
+              autoComplete="current-password"
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              type={passwordVisible ? 'text' : 'password'}
+              value={password}
+            />
+            <button
+              aria-label={passwordVisible ? 'Hide password' : 'Show password'}
+              aria-pressed={passwordVisible}
+              className="password-toggle"
+              onClick={() => setPasswordVisible((visible) => !visible)}
+              type="button"
+            >
+              {passwordVisible ? 'Hide' : 'Show'}
+            </button>
+          </span>
         </label>
         {message && <p className="error-message">{message}</p>}
         <button className="primary-button" disabled={submitting} type="submit">
@@ -242,7 +254,13 @@ function ConnectivityBadge({
   );
 }
 
-function RecountScreen({ active }: { active: ActiveSession }) {
+function RecountScreen({
+  active,
+  onSignOut,
+}: {
+  active: ActiveSession;
+  onSignOut: () => Promise<void>;
+}) {
   const [tasks, setTasks] = useState<RecountTask[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState('');
   const [inputs, setInputs] = useState(emptyInputs);
@@ -250,6 +268,7 @@ function RecountScreen({ active }: { active: ActiveSession }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const idempotencyKeys = useRef(new Map<string, string>());
 
   const selectedTask = tasks.find((task) => task.task_id === selectedTaskId);
@@ -387,6 +406,23 @@ function RecountScreen({ active }: { active: ActiveSession }) {
     }
   }
 
+  async function signOut() {
+    if (!navigator.onLine) {
+      setError('Connect to the internet before logging out safely.');
+      return;
+    }
+    setSigningOut(true);
+    setError('');
+    try {
+      await onSignOut();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Log out was unsuccessful.',
+      );
+      setSigningOut(false);
+    }
+  }
+
   return (
     <main className="count-shell recount-shell">
       <header className="count-header">
@@ -395,10 +431,20 @@ function RecountScreen({ active }: { active: ActiveSession }) {
           <h1>Recount stock</h1>
           <p>{active.warehouse.name}</p>
         </div>
-        <ConnectivityBadge
-          pending={0}
-          state={navigator.onLine ? 'Online' : 'Offline'}
-        />
+        <div className="count-header-actions">
+          <ConnectivityBadge
+            pending={0}
+            state={navigator.onLine ? 'Online' : 'Offline'}
+          />
+          <button
+            className="secondary-button logout-button"
+            disabled={signingOut}
+            onClick={() => void signOut()}
+            type="button"
+          >
+            {signingOut ? 'Logging out…' : 'Log out'}
+          </button>
+        </div>
       </header>
       <div className="blind-banner">
         Count what is physically present. Prior counts, system stock and
@@ -512,7 +558,13 @@ function RecountScreen({ active }: { active: ActiveSession }) {
   );
 }
 
-function CountingScreen({ active }: { active: ActiveSession }) {
+function CountingScreen({
+  active,
+  onSignOut,
+}: {
+  active: ActiveSession;
+  onSignOut: () => Promise<void>;
+}) {
   const [connectivity, setConnectivity] = useState<Connectivity>(
     navigator.onLine ? 'Online' : 'Offline',
   );
@@ -527,6 +579,7 @@ function CountingScreen({ active }: { active: ActiveSession }) {
   const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [recognizing, setRecognizing] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [recognition, setRecognition] = useState<RecognitionResult>();
   const countStartedAt = useRef<number | null>(null);
 
@@ -742,6 +795,29 @@ function CountingScreen({ active }: { active: ActiveSession }) {
     }
   }
 
+  async function signOut() {
+    if (pending > 0) {
+      setError(
+        `Wait for ${pending} pending ${pending === 1 ? 'item' : 'items'} to sync before logging out.`,
+      );
+      return;
+    }
+    if (!navigator.onLine) {
+      setError('Connect to the internet before logging out safely.');
+      return;
+    }
+    setSigningOut(true);
+    setError('');
+    try {
+      await onSignOut();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'Log out was unsuccessful.',
+      );
+      setSigningOut(false);
+    }
+  }
+
   return (
     <main className="count-shell">
       <header className="count-header">
@@ -750,7 +826,17 @@ function CountingScreen({ active }: { active: ActiveSession }) {
           <h1>Count stock</h1>
           <p>{active.warehouse.name}</p>
         </div>
-        <ConnectivityBadge pending={pending} state={connectivity} />
+        <div className="count-header-actions">
+          <ConnectivityBadge pending={pending} state={connectivity} />
+          <button
+            className="secondary-button logout-button"
+            disabled={signingOut}
+            onClick={() => void signOut()}
+            type="button"
+          >
+            {signingOut ? 'Logging out…' : 'Log out'}
+          </button>
+        </div>
       </header>
 
       {message && <div className="success-banner">{message}</div>}
@@ -937,6 +1023,27 @@ export function StockTakerApp() {
     setContext(data as unknown as StockTakerContext);
   }, []);
 
+  async function signOutStockTaker() {
+    if (context?.session) {
+      const { data, error: endError } = await supabase.rpc(
+        'end_stock_taker_session',
+        { p_session_id: context.session.id },
+      );
+      if (endError) throw endError;
+      const result = data as {
+        error?: { message?: string };
+        success?: boolean;
+      } | null;
+      if (!result?.success) {
+        throw new Error(
+          result?.error?.message ?? 'The counting session could not be ended.',
+        );
+      }
+    }
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) throw signOutError;
+  }
+
   useEffect(() => {
     void supabase.auth
       .getSession()
@@ -994,8 +1101,8 @@ export function StockTakerApp() {
       />
     );
   return context.session.stock_take.status === 'RECOUNT' ? (
-    <RecountScreen active={context.session} />
+    <RecountScreen active={context.session} onSignOut={signOutStockTaker} />
   ) : (
-    <CountingScreen active={context.session} />
+    <CountingScreen active={context.session} onSignOut={signOutStockTaker} />
   );
 }
