@@ -732,6 +732,10 @@ td small {
   max-height: 14rem;
   margin: 0.7rem 0;
 }
+.template-button {
+  width: 100%;
+  margin: 0.35rem 0 0.8rem;
+}
 .compact-table td {
   max-width: 14rem;
   overflow: hidden;
