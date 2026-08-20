@@ -5,7 +5,7 @@ import {
   productMasterLogicalFields,
   validateColumnMapping,
 } from '../imports/mapping';
-import { parseCsv, type ParsedCsv } from '../imports/csv';
+import { csvText, parseCsv, type ParsedCsv } from '../imports/csv';
 
 type Product = Database['public']['Tables']['products']['Row'];
 type Brand = Database['public']['Tables']['brands']['Row'];
@@ -263,6 +263,22 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
     }
   }
 
+  function downloadTemplate() {
+    const template = csvText([...productMasterLogicalFields], []);
+    const blobUrl = URL.createObjectURL(
+      new Blob([`\uFEFF${template}`], { type: 'text/csv;charset=utf-8' }),
+    );
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = 'stock-item-upload-template.csv';
+    link.click();
+    URL.revokeObjectURL(blobUrl);
+    setError('');
+    setMessage(
+      'CSV template downloaded. Product code and product name are required.',
+    );
+  }
+
   async function runImport() {
     if (!parsed || !sourceFile) return;
     const validation = validateColumnMapping('product_master', mapping);
@@ -438,8 +454,16 @@ export function ProductCatalog({ companyId }: { companyId: string }) {
           <p className="step-label">CSV spreadsheet</p>
           <h3>Bulk upload</h3>
           <p className="muted-copy">
-            Choose a CSV, confirm which headings match, preview it, then import.
+            Download the correctly aligned template, populate it, then upload
+            the completed CSV. Product code and product name are required.
           </p>
+          <button
+            className="secondary-button template-button"
+            onClick={downloadTemplate}
+            type="button"
+          >
+            Download CSV template
+          </button>
           <input
             aria-label="Choose stock item CSV"
             accept=".csv,text/csv"
